@@ -1,0 +1,213 @@
+#!/bin/bash
+
+STATE_DIR=/var/lib/ros2_distrobox_install
+STATE_FILE=state
+script_name=$(basename $0)
+ROS_RELEASE=humble
+UBUNTU_RELEASE=jammy
+
+function usage() {
+    echo "usage: $script_name [-h|?] [-u]"
+    echo "   -h|? : this help"
+    echo "   -u : update"
+    echo ""
+}
+
+function install_prerequisites() {
+    apt install -y lsb-release
+    if [ $? -ne 0 ]; then
+        echo "lsb-release install failed, cannot continue"
+        exit 1
+    fi
+    echo "lsb-release installed"
+    apt install -y software-properties-common
+    if [ $? -ne 0 ]; then
+        echo "software-properties-common install failed, cannot continue"
+        exit 1
+    fi
+    apt install -y wget
+    if [ $? -ne 0 ]; then
+        echo "wget install failed, cannot continue"
+        exit 1
+    fi
+    return 0
+}
+
+function set_locale() {
+    locale-gen en_US en_US.UTF-8
+    update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
+    export LANG=en_US.UTF-8
+}
+
+function setup_ros_repo() {
+    sudo apt update && sudo apt install curl -y
+    sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
+    apt update
+}
+
+function setup_clearpath_repo() {
+    wget https://packages.clearpathrobotics.com/public.key -O - | sudo apt-key add -
+    sudo sh -c 'echo "deb https://packages.clearpathrobotics.com/stable/ubuntu $(lsb_release -cs) main" > /etc/apt/sources.list.d/clearpath-latest.list'
+    apt update
+}
+
+function install_ros() {
+    apt install -y ros-humble-desktop-full
+    apt install -y ros-dev-tools
+}
+
+function update_system() {
+    echo "Running system update"
+    apt update
+    if [ $? -ne 0 ]; then
+        return 1
+    fi
+    apt full-upgrade -y
+    if [ $? -ne 0 ]; then
+        bitch_about_proxy
+        return 1
+    fi
+    echo "System updated"
+    return 0
+}
+
+function install_ros_packages() {
+
+    local packages
+    echo "Installing additional ROS packages"
+    packages=(
+        "tf-transformations"
+        "rmw-cyclonedds-cpp"
+        "ros-gz"
+        "gazebo-ros-pkgs"
+    )
+    for package in "${packages[@]}"; do
+        apt-mark showhold  | grep  "ros-$ROS_RELEASE-$package" > /dev/null
+        if [ $? -ne 0 ]; then
+            apt install -y "ros-$ROS_RELEASE-$package"
+            if [ $? -ne 0 ]; then
+                return 1
+            fi
+        else
+            echo "ros-$ROS_RELEASE-$package is marked HOLD!"
+        fi
+    done
+    return 0
+}
+
+function install_packages() {
+    local packages
+    echo "Installing additional packages"
+    packages=(
+        "gazebo"
+        "vim"
+        "emacs"
+        "git"
+        "gitk"
+        "gcc"
+    )
+    apt install -y ${packages[*]}
+    s=$?
+    return $?
+}
+
+function cleanup() {
+    echo "Removing stale packages"
+    apt autoremove -y
+}
+
+function check_done() {
+    grep -w $1 $STATE_DIR/$STATE_FILE > /dev/null
+    return $?
+}
+
+function make_done() {
+    grep -w $1 $STATE_DIR/$STATE_FILE > /dev/null
+    if [ $? -ne 0 ]; then
+        echo $1 >> $STATE_DIR/$STATE_FILE
+    fi
+}
+
+update=0
+while getopts h?u arg
+do
+    case $arg in
+        [?])
+            usage
+            exit 1
+            ;;
+        [u])
+            update=1
+            ;;
+        [h])
+            usage
+            exit 0
+            ;;
+        \?)
+            echo "Invalid option: $OPTARG" 1>&2
+            exit 1
+            ;;
+        :)
+            echo "Invalid option: $OPTARG requires an argument" 1>&2
+            exit 1
+            ;;
+        *)
+            echo "ERROR: unrecognized option ($arg)" 1>&2
+            usage
+            exit 2
+            ;;
+    esac
+done
+shift $(($OPTIND - 1))
+
+if [ "$UID" != "0" ]; then
+    echo "You must be root to run this script"
+    exit 1
+fi
+
+if [ ! -d $STATE_DIR ]; then
+   echo "Creating install state file"
+   mkdir -p $STATE_DIR
+fi
+
+if [ ! -f $STATE_DIR/$STATE_FILE ]; then
+    touch $STATE_DIR/$STATE_FILE
+fi
+
+if [ $update -eq 1 ]; then
+    echo "update requested"
+    sed -i '/UPDATE_SYSTEM/d' $STATE_DIR/$STATE_FILE
+    sed -i '/INSTALL_PACKAGES/d' $STATE_DIR/$STATE_FILE
+    sed -i '/INSTALL_ROS_PACKAGES/d' $STATE_DIR/$STATE_FILE
+    sed -i '/CLEANUP/d' $STATE_DIR/$STATE_FILE
+fi
+
+step_list=(
+    "INSTALL_PREREQUISITES:install_prerequisites:Install prerequisites"
+    "UPDATE_SYSTEM:update_system:System update"
+    "INSTALL_PACKAGES:install_packages:General packages install"
+    "SET_LOCALE:set_locale:Setting locale"
+    "SETUP_ROS_REPO:setup_ros_repo:Adding ROS2 repository"
+    "SETUP_CLEARPATH_REPO:setup_clearpath_repo:Adding Clearpath repository"
+    "INSTALL_ROS:install_ros:Installing ROS"
+    "INSTALL_ROS_PACKAGES:install_ros_packages:Installing ROS packages"
+    "CLEANUP:cleanup:Cleanup"
+)
+
+for step in "${step_list[@]}" "${extra_steps[@]}"; do
+    STEP_CODE=$(echo $step | awk -F':' '{print $1}')
+    STEP_FUNC=$(echo $step | awk -F':' '{print $2}')
+    STEP_DESC=$(echo $step | awk -F':' '{print $3}')
+    check_done "$STEP_CODE"
+    if [ $? -ne 0 ]; then
+        $STEP_FUNC
+        if [ $? -ne 0 ]; then
+            echo "$STEP_DESC failed"
+            exit 1
+        fi
+        make_done "$STEP_CODE"
+    else
+        echo "$STEP_DESC already done (skipped)"
+    fi
+done
