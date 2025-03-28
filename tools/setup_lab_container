@@ -43,12 +43,8 @@ function setup_ros_repo() {
     sudo apt update && sudo apt install curl -y
     sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
-    apt update
-}
-
-function setup_clearpath_repo() {
-    wget https://packages.clearpathrobotics.com/public.key -O - | sudo apt-key add -
-    sudo sh -c 'echo "deb https://packages.clearpathrobotics.com/stable/ubuntu $(lsb_release -cs) main" > /etc/apt/sources.list.d/clearpath-latest.list'
+    wget http://packages.osrfoundation.org/gazebo.key -O - | sudo apt-key add -
+    sudo sh -c 'echo "deb http://packages.osrfoundation.org/gazebo/ubuntu-stable `lsb_release -cs` main" > /etc/apt/sources.list.d/gazebo-stable.list'
     apt update
 }
 
@@ -209,7 +205,6 @@ step_list=(
     "INSTALL_PACKAGES:install_packages:General packages install"
     "SET_LOCALE:set_locale:Setting locale"
     "SETUP_ROS_REPO:setup_ros_repo:Adding ROS2 repository"
-    "SETUP_CLEARPATH_REPO:setup_clearpath_repo:Adding Clearpath repository"
     "INSTALL_ROS:install_ros:Installing ROS"
     "INSTALL_ROS_PACKAGES:install_ros_packages:Installing ROS packages"
     "CLEANUP:cleanup:Cleanup"
