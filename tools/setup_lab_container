@@ -124,7 +124,6 @@ function install_packages() {
         "gcc"
     )
     apt install -y ${packages[*]}
-    s=$?
     return $?
 }
 
