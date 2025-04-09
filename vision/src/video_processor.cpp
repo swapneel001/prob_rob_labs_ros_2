@@ -4,12 +4,14 @@
 
 using namespace std::chrono_literals;
 
-VideoProcessor::VideoProcessor(rclcpp::Node::SharedPtr node) : max_corners_(200)
+VideoProcessor::VideoProcessor(rclcpp::Node::SharedPtr node)
 {
     node_ = node;
     image_transport::ImageTransport it(node_);
     node_->declare_parameter<std::string>("image_topic", "camera/image_raw");
+    node_->declare_parameter<int>("max_features", 50);
     std::string image_topic = node_->get_parameter("image_topic").as_string();
+    max_corners_ = node_->get_parameter("max_features").as_int();
     img_subscription_ = it.subscribe(image_topic, 1,
                                      &VideoProcessor::imageCallback, this);
     img_goodfeature_pub_ = it.advertise("goodfeature/image_raw", 5);
