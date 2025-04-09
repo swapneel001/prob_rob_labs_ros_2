@@ -8,7 +8,9 @@ VideoProcessor::VideoProcessor(rclcpp::Node::SharedPtr node) : max_corners_(200)
 {
     node_ = node;
     image_transport::ImageTransport it(node_);
-    img_subscription_ = it.subscribe("/camera/image_raw", 1,
+    node_->declare_parameter<std::string>("image_topic", "camera/image_raw");
+    std::string image_topic = node_->get_parameter("image_topic").as_string();
+    img_subscription_ = it.subscribe(image_topic, 1,
                                      &VideoProcessor::imageCallback, this);
     img_goodfeature_pub_ = it.advertise("goodfeature/image_raw", 5);
     RCLCPP_INFO(node_->get_logger(), "max corners is %d", max_corners_);
