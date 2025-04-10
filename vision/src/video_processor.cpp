@@ -15,6 +15,7 @@ VideoProcessor::VideoProcessor(rclcpp::Node::SharedPtr node)
     img_subscription_ = it.subscribe(image_topic, 1,
                                      &VideoProcessor::imageCallback, this);
     img_goodfeature_pub_ = it.advertise("goodfeature/image_raw", 5);
+    goodfeature_pub_ = node_->create_publisher<prob_rob_msgs::msg::Point2DArrayStamped>("goodfeature/corners", 1);
     RCLCPP_INFO(node_->get_logger(), "max corners is %d", max_corners_);
 }
 
@@ -33,6 +34,7 @@ void VideoProcessor::imageCallback(const sensor_msgs::msg::Image::ConstSharedPtr
         int block_size = 3;
         bool use_harris_detector = false;
         double k = 0.04;
+	prob_rob_msgs::msg::Point2DArrayStamped corners_msg;
 
         cv::RNG rng(12345);
 
@@ -53,7 +55,17 @@ void VideoProcessor::imageCallback(const sensor_msgs::msg::Image::ConstSharedPtr
 
         sensor_msgs::msg::Image::SharedPtr goodfeature_msg =
             cv_bridge::CvImage(msg->header, "bgr8", frame).toImageMsg();
+
+	for (const cv::Point2f& i : corners) {
+	  prob_rob_msgs::msg::Point2D corner;
+	  corner.x = i.x;
+	  corner.y = i.y;
+	  corners_msg.points.push_back(corner);
+	}
+	corners_msg.header = msg->header;
+
         img_goodfeature_pub_.publish(goodfeature_msg);
+        goodfeature_pub_->publish(corners_msg);
     }
     catch (cv_bridge::Exception& e)
     {
