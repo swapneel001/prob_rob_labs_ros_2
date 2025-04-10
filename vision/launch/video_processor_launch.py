@@ -10,6 +10,11 @@ def generate_launch_description():
         default_value='/camera/image_raw',
         description='Topic to which the video processor subscribes'
     )
+    goodfeature_image_topic_arg = DeclareLaunchArgument(
+        'goodfeature_image_topic',
+        default_value='/goodfeature/image_raw',
+        description='Visualization topic for goodfeature detector'
+    )
     max_features_arg = DeclareLaunchArgument(
         'max_features',
         default_value='50',
@@ -19,6 +24,7 @@ def generate_launch_description():
     return LaunchDescription([
         # Add the launch argument
         image_topic_arg,
+        goodfeature_image_topic_arg,
         max_features_arg,
         # Node configuration with the image_topic parameter
         Node(
@@ -28,6 +34,7 @@ def generate_launch_description():
             output='screen',
             parameters=[
                 {'image_topic': LaunchConfiguration('image_topic')},
+                {'goodfeature_image_topic': LaunchConfiguration('goodfeature_image_topic')},
                 {'max_features': LaunchConfiguration('max_features')}
             ]
         )
