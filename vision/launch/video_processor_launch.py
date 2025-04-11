@@ -15,6 +15,11 @@ def generate_launch_description():
         default_value='/goodfeature/image_raw',
         description='Visualization topic for goodfeature detector'
     )
+    goodfeature_corners_topic_arg = DeclareLaunchArgument(
+        'goodfeature_corners_topic',
+        default_value='/goodfeature/corners',
+        description='Output topic for goodfeature detector'
+    )
     max_features_arg = DeclareLaunchArgument(
         'max_features',
         default_value='50',
@@ -25,6 +30,7 @@ def generate_launch_description():
         # Add the launch argument
         image_topic_arg,
         goodfeature_image_topic_arg,
+        goodfeature_corners_topic_arg,
         max_features_arg,
         # Node configuration with the image_topic parameter
         Node(
@@ -35,6 +41,7 @@ def generate_launch_description():
             parameters=[
                 {'image_topic': LaunchConfiguration('image_topic')},
                 {'goodfeature_image_topic': LaunchConfiguration('goodfeature_image_topic')},
+                {'goodfeature_corners_topic': LaunchConfiguration('goodfeature_corners_topic')},
                 {'max_features': LaunchConfiguration('max_features')}
             ]
         )

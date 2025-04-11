@@ -10,14 +10,16 @@ VideoProcessor::VideoProcessor(rclcpp::Node::SharedPtr node)
     image_transport::ImageTransport it(node_);
     node_->declare_parameter<std::string>("image_topic", "camera/image_raw");
     node_->declare_parameter<std::string>("goodfeature_image_topic", "goodfeature/image_raw");
+    node_->declare_parameter<std::string>("goodfeature_corners_topic", "goodfeature/corners");
     node_->declare_parameter<int>("max_features", 50);
     std::string image_topic = node_->get_parameter("image_topic").as_string();
     std::string goodfeature_image_topic = node_->get_parameter("goodfeature_image_topic").as_string();
+    std::string goodfeature_corners_topic = node_->get_parameter("goodfeature_corners_topic").as_string();
     max_corners_ = node_->get_parameter("max_features").as_int();
     img_subscription_ = it.subscribe(image_topic, 1,
                                      &VideoProcessor::imageCallback, this);
     img_goodfeature_pub_ = it.advertise(goodfeature_image_topic, 5);
-    goodfeature_pub_ = node_->create_publisher<prob_rob_msgs::msg::Point2DArrayStamped>("goodfeature/corners", 1);
+    goodfeature_pub_ = node_->create_publisher<prob_rob_msgs::msg::Point2DArrayStamped>(goodfeature_corners_topic, 1);
     RCLCPP_INFO(node_->get_logger(), "max corners is %d", max_corners_);
 }
 
