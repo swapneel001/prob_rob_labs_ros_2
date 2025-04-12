@@ -22,6 +22,7 @@ private:
     rclcpp::Publisher<prob_rob_msgs::msg::Point2DArrayStamped>::SharedPtr goodfeature_pub_;
     int max_corners_;
     bool run_color_filter_;
+    int min_h_, max_h_, min_s_, max_s_, min_v_, max_v_;
 };
 
 #endif // VIDEO_PROCESSOR_HPP

@@ -13,11 +13,24 @@ VideoProcessor::VideoProcessor(rclcpp::Node::SharedPtr node)
     node_->declare_parameter<std::string>("goodfeature_corners_topic", "goodfeature/corners");
     node_->declare_parameter<int>("max_features", 50);
     node_->declare_parameter<bool>("run_color_filter", false);
+    node_->declare_parameter<int>("min_h", 0);
+    node_->declare_parameter<int>("max_h", 360);
+    node_->declare_parameter<int>("min_s", 0);
+    node_->declare_parameter<int>("max_s", 255);
+    node_->declare_parameter<int>("min_v", 0);
+    node_->declare_parameter<int>("max_v", 255);
+
     std::string image_topic = node_->get_parameter("image_topic").as_string();
     std::string goodfeature_image_topic = node_->get_parameter("goodfeature_image_topic").as_string();
     std::string goodfeature_corners_topic = node_->get_parameter("goodfeature_corners_topic").as_string();
     max_corners_ = node_->get_parameter("max_features").as_int();
     run_color_filter_ = node_->get_parameter("run_color_filter").as_bool();
+    min_h_ = node_->get_parameter("min_h").as_int();
+    max_h_ = node_->get_parameter("max_h").as_int();
+    min_s_ = node_->get_parameter("min_s").as_int();
+    max_s_ = node_->get_parameter("max_s").as_int();
+    min_v_ = node_->get_parameter("min_v").as_int();
+    max_v_ = node_->get_parameter("max_v").as_int();
     img_subscription_ = it.subscribe(image_topic, 1,
                                      &VideoProcessor::imageCallback, this);
     img_goodfeature_pub_ = it.advertise(goodfeature_image_topic, 5);
