@@ -25,6 +25,11 @@ def generate_launch_description():
         default_value='50',
         description='Maximum number of features to extract'
     )
+    run_color_filter_arg = DeclareLaunchArgument(
+        'run_color_filter',
+        default_value='false',
+        description='Set to true to run the color filter first'
+    )
 
     return LaunchDescription([
         # Add the launch argument
@@ -32,6 +37,7 @@ def generate_launch_description():
         goodfeature_image_topic_arg,
         goodfeature_corners_topic_arg,
         max_features_arg,
+        run_color_filter_arg,
         # Node configuration with the image_topic parameter
         Node(
             package='prob_rob_vision',
@@ -42,7 +48,8 @@ def generate_launch_description():
                 {'image_topic': LaunchConfiguration('image_topic')},
                 {'goodfeature_image_topic': LaunchConfiguration('goodfeature_image_topic')},
                 {'goodfeature_corners_topic': LaunchConfiguration('goodfeature_corners_topic')},
-                {'max_features': LaunchConfiguration('max_features')}
+                {'max_features': LaunchConfiguration('max_features')},
+                {'run_color_filter': LaunchConfiguration('run_color_filter')}
             ]
         )
     ])
