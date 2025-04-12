@@ -36,9 +36,11 @@ VideoProcessor::VideoProcessor(rclcpp::Node::SharedPtr node)
     img_goodfeature_pub_ = it.advertise(goodfeature_image_topic, 5);
     goodfeature_pub_ = node_->create_publisher<prob_rob_msgs::msg::Point2DArrayStamped>(goodfeature_corners_topic, 1);
     RCLCPP_INFO(node_->get_logger(), "max corners is %d", max_corners_);
-    if (run_color_filter_)
+    if (run_color_filter_) {
         RCLCPP_INFO(node->get_logger(), "using color filter");
-    else
+        RCLCPP_INFO(node->get_logger(), "h=[%d, %d], s=[%d, %d], v=[%d, %d]",
+                    min_h_, max_h_, min_s_, max_s_, min_v_, max_v_);
+    } else
         RCLCPP_INFO(node->get_logger(), "not using color filter");
 }
 
