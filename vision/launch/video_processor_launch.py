@@ -14,6 +14,11 @@ def generate_launch_description():
         default_value='/goodfeature/image_raw',
         description='Visualization topic for goodfeature detector'
     )
+    gray_image_topic_arg = DeclareLaunchArgument(
+        'gray_image_topic',
+        default_value='/gray/image_raw',
+        description='Visualization topic for grayscale interim image'
+    )
     goodfeature_corners_topic_arg = DeclareLaunchArgument(
         'goodfeature_corners_topic',
         default_value='/goodfeature/corners',
@@ -64,6 +69,7 @@ def generate_launch_description():
         # Add the launch argument
         image_topic_arg,
         goodfeature_image_topic_arg,
+        gray_image_topic_arg,
         goodfeature_corners_topic_arg,
         max_features_arg,
         run_color_filter_arg,
@@ -82,6 +88,7 @@ def generate_launch_description():
             parameters=[
                 {'image_topic': LaunchConfiguration('image_topic')},
                 {'goodfeature_image_topic': LaunchConfiguration('goodfeature_image_topic')},
+                {'gray_image_topic': LaunchConfiguration('gray_image_topic')},
                 {'goodfeature_corners_topic': LaunchConfiguration('goodfeature_corners_topic')},
                 {'max_features': LaunchConfiguration('max_features')},
                 {'run_color_filter': LaunchConfiguration('run_color_filter')},

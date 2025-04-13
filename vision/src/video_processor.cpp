@@ -10,6 +10,7 @@ VideoProcessor::VideoProcessor(rclcpp::Node::SharedPtr node)
     image_transport::ImageTransport it(node_);
     node_->declare_parameter<std::string>("image_topic", "camera/image_raw");
     node_->declare_parameter<std::string>("goodfeature_image_topic", "goodfeature/image_raw");
+    node_->declare_parameter<std::string>("gray_image_topic", "gray/image_raw");
     node_->declare_parameter<std::string>("goodfeature_corners_topic", "goodfeature/corners");
     node_->declare_parameter<int>("max_features", 50);
     node_->declare_parameter<bool>("run_color_filter", false);
@@ -21,6 +22,7 @@ VideoProcessor::VideoProcessor(rclcpp::Node::SharedPtr node)
     node_->declare_parameter<int>("max_v", 255);
 
     std::string image_topic = node_->get_parameter("image_topic").as_string();
+    std::string gray_image_topic = node_->get_parameter("gray_image_topic").as_string();
     std::string goodfeature_image_topic = node_->get_parameter("goodfeature_image_topic").as_string();
     std::string goodfeature_corners_topic = node_->get_parameter("goodfeature_corners_topic").as_string();
     max_corners_ = node_->get_parameter("max_features").as_int();
@@ -34,6 +36,7 @@ VideoProcessor::VideoProcessor(rclcpp::Node::SharedPtr node)
     updateCondition();
     img_subscription_ = it.subscribe(image_topic, 1,
                                      &VideoProcessor::imageCallback, this);
+    img_gray_pub_ = it.advertise(gray_image_topic, 5);
     img_goodfeature_pub_ = it.advertise(goodfeature_image_topic, 5);
     goodfeature_pub_ = node_->create_publisher<prob_rob_msgs::msg::Point2DArrayStamped>(goodfeature_corners_topic, 1);
     RCLCPP_INFO(node_->get_logger(), "max corners is %d", max_corners_);
@@ -113,6 +116,8 @@ void VideoProcessor::imageCallback(const sensor_msgs::msg::Image::ConstSharedPtr
 
         sensor_msgs::msg::Image::SharedPtr goodfeature_msg =
             cv_bridge::CvImage(msg->header, "bgr8", frame).toImageMsg();
+        sensor_msgs::msg::Image::SharedPtr gray_msg =
+            cv_bridge::CvImage(msg->header, "mono8", gray_frame).toImageMsg();
 
         for (const cv::Point2f& i : corners) {
             prob_rob_msgs::msg::Point2D corner;
@@ -122,6 +127,7 @@ void VideoProcessor::imageCallback(const sensor_msgs::msg::Image::ConstSharedPtr
         }
         corners_msg.header = msg->header;
 
+        img_gray_pub_.publish(gray_msg);
         img_goodfeature_pub_.publish(goodfeature_msg);
         goodfeature_pub_->publish(corners_msg);
     }
