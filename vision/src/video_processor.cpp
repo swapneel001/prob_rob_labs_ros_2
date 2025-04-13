@@ -31,6 +31,7 @@ VideoProcessor::VideoProcessor(rclcpp::Node::SharedPtr node)
     max_s_ = node_->get_parameter("max_s").as_int();
     min_v_ = node_->get_parameter("min_v").as_int();
     max_v_ = node_->get_parameter("max_v").as_int();
+    updateCondition();
     img_subscription_ = it.subscribe(image_topic, 1,
                                      &VideoProcessor::imageCallback, this);
     img_goodfeature_pub_ = it.advertise(goodfeature_image_topic, 5);
@@ -44,13 +45,45 @@ VideoProcessor::VideoProcessor(rclcpp::Node::SharedPtr node)
         RCLCPP_INFO(node->get_logger(), "not using color filter");
 }
 
+void VideoProcessor::updateCondition()
+{
+    if (max_s_ < min_s_)
+        std::swap(max_s_, min_s_);
+    if (max_v_ < min_v_)
+        std::swap(max_v_, min_v_);
+    lower_color_range_ = cv::Scalar(min_h_ / 2, min_s_, min_v_, 0);
+    upper_color_range_ = cv::Scalar(max_h_ / 2, max_s_, max_v_, 0);
+}
+
+void VideoProcessor::HSVFilter(const cv::Mat& input_image, cv::Mat& output_image)  // NOLINT(modernize-use-override)
+{
+    cv::Mat hsv_image;
+    cv::cvtColor(input_image, hsv_image, cv::COLOR_BGR2HSV);
+    if (lower_color_range_[0] < upper_color_range_[0]) {
+        cv::inRange(hsv_image, lower_color_range_, upper_color_range_, output_image);
+    } else {
+        cv::Scalar lower_color_range_0 = cv::Scalar(0, min_s_, min_v_, 0);
+        cv::Scalar upper_color_range_0 = cv::Scalar(max_h_ / 2, max_s_, max_v_, 0);
+        cv::Scalar lower_color_range_360 = cv::Scalar(min_h_ / 2, min_s_, min_v_, 0);
+        cv::Scalar upper_color_range_360 = cv::Scalar(360 / 2,max_s_, max_v_, 0);
+        cv::Mat output_image_0, output_image_360;
+        cv::inRange(hsv_image, lower_color_range_0, upper_color_range_0, output_image_0);
+        cv::inRange(hsv_image, lower_color_range_360, upper_color_range_360, output_image_360);
+        output_image = output_image_0 | output_image_360;
+    }
+}
+
 void VideoProcessor::imageCallback(const sensor_msgs::msg::Image::ConstSharedPtr& msg)
 {
     try {
         cv::Mat frame = cv_bridge::toCvShare(msg, sensor_msgs::image_encodings::BGR8)->image;
         // Process the frame (e.g., convert to grayscale)
         cv::Mat gray_frame;
-        cv::cvtColor(frame, gray_frame, cv::COLOR_BGR2GRAY);
+
+        if (run_color_filter_)
+            HSVFilter(frame, gray_frame);
+        else
+            cv::cvtColor(frame, gray_frame, cv::COLOR_BGR2GRAY);
 
         /// Parameters for Shi-Tomasi algorithm
         std::vector<cv::Point2f> corners;
