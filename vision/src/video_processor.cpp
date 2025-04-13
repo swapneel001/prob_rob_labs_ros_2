@@ -59,7 +59,7 @@ void VideoProcessor::imageCallback(const sensor_msgs::msg::Image::ConstSharedPtr
         int block_size = 3;
         bool use_harris_detector = false;
         double k = 0.04;
-	prob_rob_msgs::msg::Point2DArrayStamped corners_msg;
+        prob_rob_msgs::msg::Point2DArrayStamped corners_msg;
 
         cv::RNG rng(12345);
 
@@ -81,13 +81,13 @@ void VideoProcessor::imageCallback(const sensor_msgs::msg::Image::ConstSharedPtr
         sensor_msgs::msg::Image::SharedPtr goodfeature_msg =
             cv_bridge::CvImage(msg->header, "bgr8", frame).toImageMsg();
 
-	for (const cv::Point2f& i : corners) {
-	  prob_rob_msgs::msg::Point2D corner;
-	  corner.x = i.x;
-	  corner.y = i.y;
-	  corners_msg.points.push_back(corner);
-	}
-	corners_msg.header = msg->header;
+        for (const cv::Point2f& i : corners) {
+            prob_rob_msgs::msg::Point2D corner;
+            corner.x = i.x;
+            corner.y = i.y;
+            corners_msg.points.push_back(corner);
+        }
+        corners_msg.header = msg->header;
 
         img_goodfeature_pub_.publish(goodfeature_msg);
         goodfeature_pub_->publish(corners_msg);
