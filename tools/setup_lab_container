@@ -123,6 +123,7 @@ function install_packages() {
         "git"
         "gitk"
         "gcc"
+        "python-is-python3"
     )
     apt install -y ${packages[*]}
     return $?
