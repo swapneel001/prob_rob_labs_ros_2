@@ -20,7 +20,6 @@
 # Ilija Hadzic <ih2435@columbia.edu>
 #
 
-
 import os
 
 from ament_index_python.packages import get_package_share_directory
@@ -29,6 +28,9 @@ from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import PathJoinSubstitution
+from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     tb3_launch_dir = os.path.join(get_package_share_directory(
@@ -39,17 +41,25 @@ def generate_launch_description():
     x_pose = LaunchConfiguration('x_pose', default='-1.5')
     y_pose = LaunchConfiguration('y_pose', default='0.0')
 
-    world = os.path.join(
-        get_package_share_directory('prob_rob_labs'),
+    world = LaunchConfiguration('world', default='door.world')
+
+    world_path = PathJoinSubstitution([
+        FindPackageShare('prob_rob_labs'),
         'worlds',
-        'door.world'
+        world
+    ])
+
+    declare_world_arg = DeclareLaunchArgument(
+        'world',
+        default_value='door.world',
+        description='Name of the world file (located in prob_rob_labs/worlds/)'
     )
 
     gzserver_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_gazebo_ros, 'launch', 'gzserver.launch.py')
         ),
-        launch_arguments={'world': world}.items()
+        launch_arguments={'world': world_path}.items()
     )
 
     gzclient_cmd = IncludeLaunchDescription(
@@ -77,7 +87,7 @@ def generate_launch_description():
 
     ld = LaunchDescription()
 
-    # Add the commands to the launch description
+    ld.add_action(declare_world_arg)
     ld.add_action(gzserver_cmd)
     ld.add_action(gzclient_cmd)
     ld.add_action(robot_state_publisher_cmd)
