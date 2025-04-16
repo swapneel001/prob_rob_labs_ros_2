@@ -32,6 +32,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'flaky_door_opener = flaky_door_opener.flaky_door_opener:main',
         ],
     }
 )
