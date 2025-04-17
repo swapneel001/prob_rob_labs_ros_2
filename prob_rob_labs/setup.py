@@ -32,6 +32,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'image_mean_feature_x = image_mean_feature_x.image_mean_feature_x:main',
             'flaky_door_opener = flaky_door_opener.flaky_door_opener:main',
         ],
     }
