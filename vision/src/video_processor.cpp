@@ -111,8 +111,8 @@ void VideoProcessor::imageCallback(const sensor_msgs::msg::Image::ConstSharedPtr
                                                     rng.uniform(0, 255)),
                        -1, 8, 0);
         }
-        RCLCPP_INFO(node_->get_logger(), "number of corners detected: %ld",
-                    corners.size());
+        RCLCPP_DEBUG(node_->get_logger(), "number of corners detected: %ld",
+                     corners.size());
 
         sensor_msgs::msg::Image::SharedPtr goodfeature_msg =
             cv_bridge::CvImage(msg->header, "bgr8", frame).toImageMsg();
