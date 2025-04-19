@@ -52,6 +52,8 @@ def generate_launch_description():
 
     run_door_opener = LaunchConfiguration('run_door_opener', default='false')
 
+    run_vision_processor = LaunchConfiguration('run_vision_processor', default='false')
+
     declare_world_arg = DeclareLaunchArgument(
         'world',
         default_value='door.world',
@@ -62,6 +64,12 @@ def generate_launch_description():
         'run_door_opener',
         default_value='false',
         description='Whether to run the flaky door opener node'
+    )
+
+    declare_run_vision_processor_arg = DeclareLaunchArgument(
+        'run_vision_processor',
+        default_value='false',
+        description='Whether to run the vision processing nodes'
     )
 
     gzserver_cmd = IncludeLaunchDescription(
@@ -101,14 +109,31 @@ def generate_launch_description():
         condition=IfCondition(run_door_opener)
     )
 
+    video_processor_cmd = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(get_package_share_directory('prob_rob_vision'), 'launch', 'video_processor_launch.py')
+        ),
+        condition=IfCondition(run_vision_processor)
+    )
+
+    image_mean_feature_x_cmd = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(get_package_share_directory('prob_rob_labs'), 'launch', 'image_mean_feature_x_launch.py')
+        ),
+        condition=IfCondition(run_vision_processor)
+    )
+
     ld = LaunchDescription()
 
     ld.add_action(declare_world_arg)
     ld.add_action(declare_run_door_opener_arg)
+    ld.add_action(declare_run_vision_processor_arg)
     ld.add_action(gzserver_cmd)
     ld.add_action(gzclient_cmd)
     ld.add_action(robot_state_publisher_cmd)
     ld.add_action(spawn_turtlebot_cmd)
     ld.add_action(flaky_door_opener_cmd)
+    ld.add_action(video_processor_cmd)
+    ld.add_action(image_mean_feature_x_cmd)
 
     return ld
