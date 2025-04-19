@@ -31,6 +31,7 @@ from launch.substitutions import LaunchConfiguration
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
+from launch.conditions import IfCondition
 
 def generate_launch_description():
     tb3_launch_dir = os.path.join(get_package_share_directory(
@@ -49,10 +50,18 @@ def generate_launch_description():
         world
     ])
 
+    run_door_opener = LaunchConfiguration('run_door_opener', default='false')
+
     declare_world_arg = DeclareLaunchArgument(
         'world',
         default_value='door.world',
         description='Name of the world file (located in prob_rob_labs/worlds/)'
+    )
+
+    declare_run_door_opener_arg = DeclareLaunchArgument(
+        'run_door_opener',
+        default_value='false',
+        description='Whether to run the flaky door opener node'
     )
 
     gzserver_cmd = IncludeLaunchDescription(
@@ -85,12 +94,21 @@ def generate_launch_description():
         }.items()
     )
 
+    flaky_door_opener_cmd = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(get_package_share_directory('prob_rob_labs'), 'launch', 'flaky_door_opener_launch.py')
+        ),
+        condition=IfCondition(run_door_opener)
+    )
+
     ld = LaunchDescription()
 
     ld.add_action(declare_world_arg)
+    ld.add_action(declare_run_door_opener_arg)
     ld.add_action(gzserver_cmd)
     ld.add_action(gzclient_cmd)
     ld.add_action(robot_state_publisher_cmd)
     ld.add_action(spawn_turtlebot_cmd)
+    ld.add_action(flaky_door_opener_cmd)
 
     return ld
