@@ -4,6 +4,11 @@ from launch_ros.actions import Node
 from launch.substitutions import LaunchConfiguration
 
 def generate_launch_description():
+    node_name_arg = DeclareLaunchArgument(
+        'node_name',
+        default_value='video_processor',
+        description='Video processor node name'
+    )
     image_topic_arg = DeclareLaunchArgument(
         'image_topic',
         default_value='/camera/image_raw',
@@ -66,7 +71,7 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        # Add the launch argument
+        node_name_arg,
         image_topic_arg,
         goodfeature_image_topic_arg,
         gray_image_topic_arg,
@@ -83,7 +88,7 @@ def generate_launch_description():
         Node(
             package='prob_rob_vision',
             executable='video_processor',
-            name='video_processor',
+            name=LaunchConfiguration('node_name'),
             output='screen',
             parameters=[
                 {'image_topic': LaunchConfiguration('image_topic')},
