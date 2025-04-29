@@ -51,6 +51,7 @@ function setup_ros_repo() {
 function install_ros() {
     apt install -y ros-humble-desktop-full
     apt install -y ros-dev-tools
+    rosdep init
 }
 
 function update_system() {
