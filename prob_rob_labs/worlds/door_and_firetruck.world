@@ -71,7 +71,7 @@
     <include>
       <name>firetruck</name>
       <uri>model://fire_truck</uri>
-      <pose>45.0 5.0 0.0 0.0 0.0 0.0</pose>
+      <pose>25.0 5.0 0.0 0.0 0.0 0.0</pose>
     </include>
     <gui fullscreen='0'>
       <camera name='user_camera'>
