@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node
 
 
-heartbeat_period = 1
+heartbeat_period = 0.1
 
 class CLASS(Node):
 
