@@ -26,7 +26,7 @@ class FlakyDoorOpener(Node):
         elif self.torque_counter < torque_hold:
             self.torque_counter += 1
         else:
-            self.torque = 0
+            self.torque = 0.0
         self.log.info(f'door open requested using torque {self.torque}')
         self.pub_torque.publish(Float64(data=self.torque))
 
