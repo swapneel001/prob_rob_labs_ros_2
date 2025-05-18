@@ -2,8 +2,7 @@
 #include <gazebo/physics/physics.hh>
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/pose.hpp>
-#include <geometry_msgs/msg/pose_array.hpp>
-#include <std_msgs/msg/string.hpp>
+#include <geometry_msgs/msg/twist.hpp>
 #include <gazebo_msgs/msg/link_states.hpp>
 
 namespace gazebo
