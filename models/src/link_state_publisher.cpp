@@ -46,6 +46,17 @@ public:
         ros_pose.orientation.z = pose.Rot().Z();
         ros_pose.orientation.w = pose.Rot().W();
         msg.pose.push_back(ros_pose);
+
+        ignition::math::Vector3d lin_vel = link->WorldLinearVel();
+        ignition::math::Vector3d ang_vel = link->WorldAngularVel();
+        geometry_msgs::msg::Twist ros_twist;
+        ros_twist.linear.x = lin_vel.X();
+        ros_twist.linear.y = lin_vel.Y();
+        ros_twist.linear.z = lin_vel.Z();
+        ros_twist.angular.x = ang_vel.X();
+        ros_twist.angular.y = ang_vel.Y();
+        ros_twist.angular.z = ang_vel.Z();
+        msg.twist.push_back(ros_twist);
       }
     }
 
