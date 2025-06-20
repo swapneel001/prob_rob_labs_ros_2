@@ -119,7 +119,6 @@ function install_packages() {
     packages=(
         "gazebo"
         "ignition"
-        "ignition-fortress"
         "vim"
         "emacs"
         "git"
