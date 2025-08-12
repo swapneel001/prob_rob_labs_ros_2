@@ -96,6 +96,7 @@ function install_ros_packages() {
         "turtlebot3-simulations"
         "dynamixel-sdk"
         "rqt-robot-steering"
+        "rqt-tf-tree"
         "cv-bridge"
         "image-view"
     )
