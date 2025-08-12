@@ -131,6 +131,20 @@ function install_packages() {
     return $?
 }
 
+function generate_cyclone_config() {
+    echo "Generating CycloneDDS config"
+    cat >> /home/$SUDO_USER/cyclone_config.xml <<'EOF'
+<CycloneDDS>
+  <Discovery>
+    <ParticipantIndex>auto</ParticipantIndex>
+    <MaxAutoParticipantIndex>128</MaxAutoParticipantIndex>
+  </Discovery>
+</CycloneDDS>
+EOF
+    sudo chown $SUDO_USER.$SUDO_USER /home/$SUDO_USER/cyclone_config.xml
+    return 0
+}
+
 function update_local_account() {
     cat >> /home/$SUDO_USER/.bashrc <<'EOF'
 DISTROBOX_HOSTNAME=$(hostname)
@@ -146,10 +160,11 @@ if [ "$DISTROBOX_HOSTNAME" = "humble-e6911" ]; then
     alias cc_build='cd $MY_WORKSPACE; colcon build --symlink-install --packages-select prob_rob_labs; cd -'  
     alias cc_prebuild='cd $MY_WORKSPACE; colcon build --packages-skip prob_rob_labs; cd -'
     export _colcon_cd_root=/opt/ros/humble
-    #export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-    export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+    export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+    #export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
     export TURTLEBOT3_MODEL=waffle_pi
     export GIT_EDITOR=vim
+    export CYCLONEDDS_URI=/home/$(whoami)/cyclone_config.xml
 fi
 EOF
 }
@@ -239,6 +254,7 @@ step_list=(
     "INSTALL_ROS:install_ros:Installing ROS"
     "INSTALL_ROS_PACKAGES:install_ros_packages:Installing ROS packages"
     "UPDATE_LOCAL_ACCOUNT:update_local_account:Updating Account"
+    "GENERATE_CYCLONE_CONFIG:generate_cyclone_config:Generating Cyclone DDS config"
     "CLEANUP:cleanup:Cleanup"
 )
 
