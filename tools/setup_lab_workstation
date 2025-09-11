@@ -150,7 +150,7 @@ function update_local_account() {
 DISTROBOX_HOSTNAME=$(hostname)
 if [ "$DISTROBOX_HOSTNAME" = "humble-e6911" ]; then
     source /opt/ros/humble/setup.bash
-    export MY_WORKSPACE=/run/host/workdir/ROS/$(whoami)/ros2_ws
+    export MY_WORKSPACE=/run/host/workdir/$(whoami)/ros2_ws
     if [ -f $MY_WORKSPACE/install/setup.bash ]; then
         source $MY_WORKSPACE/install/setup.bash
     fi
