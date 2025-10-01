@@ -4,7 +4,6 @@ from std_msgs.msg import Float64
 from std_msgs.msg import Empty
 from geometry_msgs.msg import Twist
 
-torque_hold = 10
 heartbeat_period = 0.1
 
 class MoveThroughDoor(Node):
@@ -12,9 +11,12 @@ class MoveThroughDoor(Node):
     def __init__(self):
         super().__init__('move_through_door')
         self.log = self.get_logger()
+        self.declare_parameter('robot_speed',1.0)
         self.pub_torque = self.create_publisher(Float64,'/hinged_glass_door/torque',1)
         self.pub_vel = self.create_publisher(Twist,'/cmd_vel',10)
         self.timer = self.create_timer(heartbeat_period, self.heartbeat)
+        self.robot_speed = self.get_parameter('robot_speed').get_parameter_value().double_value
+        self.log.info(f'Robot speed is {self.robot_speed}')
         self.torque = 5.0
         self.heartbeat_counter = 0
         
@@ -26,8 +28,11 @@ class MoveThroughDoor(Node):
             self.move_robot()
         elif self.heartbeat_counter<120:
             self.stop_robot()
-        else:
+        elif self.heartbeat_counter<200:
             self.close_door()
+        else:
+            self.log.info('Robot stopped, door closed')
+            pass
         self.heartbeat_counter+=1
 
         
@@ -38,9 +43,10 @@ class MoveThroughDoor(Node):
         self.log.info('Closing door')
         self.pub_torque.publish(Float64(data =-self.torque))
     def move_robot(self):
-        self.log.info('Moving robot')
         vel_msg = Twist()
-        vel_msg.linear.x = 1.0
+        vel_msg.linear.x = self.robot_speed
+        self.log.info(f'Moving robot at speed {self.robot_speed}')
+
         self.pub_vel.publish(vel_msg)
     def stop_robot(self):
         self.log.info('Stopping robot')
