@@ -20,14 +20,32 @@ class MoveThroughDoor(Node):
         
     def heartbeat(self):
         self.log.info('heartbeat')
-        self.pub_torque.publish(Float64(data =self.torque)) 
-        self.heartbeat_counter+=1
-        if self.heartbeat_counter>50:
+        if self.heartbeat_counter<50:
+            self.open_door()
+        elif self.heartbeat_counter<100:
             self.move_robot()
+        elif self.heartbeat_counter<120:
+            self.stop_robot()
+        else:
+            self.close_door()
+        self.heartbeat_counter+=1
 
+        
+    def open_door(self):
+        self.log.info('Opening door')
+        self.pub_torque.publish(Float64(data =self.torque))
+    def close_door(self):
+        self.log.info('Closing door')
+        self.pub_torque.publish(Float64(data =-self.torque))
     def move_robot(self):
+        self.log.info('Moving robot')
         vel_msg = Twist()
-        vel_msg.linear.x = 2.0
+        vel_msg.linear.x = 1.0
+        self.pub_vel.publish(vel_msg)
+    def stop_robot(self):
+        self.log.info('Stopping robot')
+        vel_msg = Twist()
+        vel_msg.linear.x = 0.0
         self.pub_vel.publish(vel_msg)
     def spin(self):
         rclpy.spin(self)
