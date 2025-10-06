@@ -17,28 +17,53 @@ class MoveThroughDoor(Node):
         self.timer = self.create_timer(heartbeat_period, self.heartbeat)
         self.robot_speed = self.get_parameter('robot_speed').get_parameter_value().double_value
         self.log.info(f'Robot speed is {self.robot_speed}')
+        self.sub_feature_mean = self.create_subscription(Float64,'/feature_mean',self.check_feature_mean,1)
+        self.feature_mean_value = 500
         self.torque = 5.0
         self.heartbeat_counter = 0
+        self.moving_started = False
+        self.stop_started = False
+        self.close_started = False
+        self.above330_counts = 0
         
     def heartbeat(self):
         self.log.info('heartbeat')
-        if self.heartbeat_counter<50:
-            self.open_door()
-        elif self.heartbeat_counter<100:
-            self.move_robot()
-        elif self.heartbeat_counter<120:
-            self.stop_robot()
-        elif self.heartbeat_counter<200:
-            self.close_door()
-        else:
-            self.log.info('Robot stopped, door closed')
-            pass
-        self.heartbeat_counter+=1
+        
+        # Before moving: keep opening the door until it's open enough (<280)
+        if not self.moving_started:
+            if self.feature_mean_value < 280.0:
+                self.log.info('Door open detected (feature<280). Starting to move robot.')
+                self.moving_started = True
+                self.above330_ticks = 0
+                self.move_robot()
+            else:
+                # keep trying to open
+                self.log.info('Door closed. Opening door...')
+                self.open_door()
 
+        # While moving: continue moving; when feature_mean > 310 for 1s, stop then close
+        elif self.moving_started and not self.close_started:
+            if self.feature_mean_value > 330.0:
+                self.above330_ticks += 1
+                self.log.info(f'Feature>330 while moving, stop robot')
+                if self.above330_ticks >= 20:
+                    self.stop_robot()
+                    self.log.info('Stopping robot , closing door.')
+                    self.close_started = True
+        
+        elif self.close_started:
+            self.close_door()
+
+
+
+    def check_feature_mean(self, f):
+        self.feature_mean_value = f.data
+        self.log.info(f'Feature mean value is {self.feature_mean_value}')
         
     def open_door(self):
         self.log.info('Opening door')
-        self.pub_torque.publish(Float64(data =self.torque))
+        self.pub_torque.publish(Float64(data= self.torque))
+
     def close_door(self):
         self.log.info('Closing door')
         self.pub_torque.publish(Float64(data =-self.torque))
