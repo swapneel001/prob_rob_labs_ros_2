@@ -33,6 +33,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'move_through_door_bayesian = move_through_door_bayesian.move_through_door_bayesian:main',
             'move_through_door = move_through_door.move_through_door:main',
             'image_mean_feature_x = image_mean_feature_x.image_mean_feature_x:main',
             'flaky_door_opener = flaky_door_opener.flaky_door_opener:main',
