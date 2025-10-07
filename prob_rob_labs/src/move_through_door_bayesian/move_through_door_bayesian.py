@@ -12,7 +12,7 @@ class MoveThroughDoorBayesian(Node):
         super().__init__('move_through_door_bayesian')
         self.log = self.get_logger()
         self.declare_parameter('threshold', 235.0)
-        self.declare_parameter('measure_window_sec', 30.0)
+        self.declare_parameter('measure_window_sec', 60.0)
 
         self.threshold = self.get_parameter('threshold').value
         self.measure_window_sec = self.get_parameter('measure_window_sec').value
@@ -20,8 +20,8 @@ class MoveThroughDoorBayesian(Node):
         self.pub_torque = self.create_publisher(Float64, '/hinged_glass_door/torque', 1)
         self.sub_feature_mean = self.create_subscription(Float64, '/feature_mean', self.check_feature_mean, 10)
 
-        self.torque = 10.0
-        self.cmd_phase_sec = 2.0
+        self.torque = 5.0
+        self.cmd_phase_sec = 3.0
         self.settle_sec = 2.0
 
         self.state = 'open_cmd'
