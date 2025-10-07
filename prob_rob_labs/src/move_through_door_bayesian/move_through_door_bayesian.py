@@ -1,8 +1,8 @@
 import math
+import time
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float64
-import time
 
 heartbeat_period = 0.05
 
@@ -12,23 +12,23 @@ class MoveThroughDoorBayesian(Node):
         super().__init__('move_through_door_bayesian')
         self.log = self.get_logger()
         self.declare_parameter('threshold', 235.0)
-        self.declare_parameter('window_sec', 20.0)
+        self.declare_parameter('measure_window_sec', 30.0)
 
         self.threshold = self.get_parameter('threshold').value
-        self.window_sec = self.get_parameter('window_sec').value
-
-        self.torque = 50.0
-        self.phase_sec = 2
-        self.ignore_sec = 0.2
+        self.measure_window_sec = self.get_parameter('measure_window_sec').value
 
         self.pub_torque = self.create_publisher(Float64, '/hinged_glass_door/torque', 1)
         self.sub_feature_mean = self.create_subscription(Float64, '/feature_mean', self.check_feature_mean, 10)
 
-        self.start_time = None
-        self.phase_start_time = None
-        self.open_phase = True
+        self.torque = 10.0
+        self.cmd_phase_sec = 2.0
+        self.settle_sec = 2.0
 
-        self.feature_mean_value = 0.0
+        self.state = 'open_cmd'
+        self.state_start = None
+        self.measure_active = False
+        self.current_x_open = None
+
         self.below = 0
         self.above = 0
         self.xopen_n = 0
@@ -39,55 +39,76 @@ class MoveThroughDoorBayesian(Node):
         self.zclosed_xclosed = 0
 
         self.timer = self.create_timer(heartbeat_period, self.heartbeat)
-        self.log.info(f'Threshold={self.threshold}, window={self.window_sec}s')
+        self.log.info(f'Threshold={self.threshold}, measure_window_sec={self.measure_window_sec}s')
 
     def now(self):
         return time.time()
 
     def heartbeat(self):
-        now = self.now()
-        if self.start_time is None:
-            self.start_time = now
-            self.phase_start_time = now
+        t = self.now()
+        if self.state_start is None:
+            self.state_start = t
+        dt = t - self.state_start
 
-        if now - self.start_time >= self.window_sec:
-            self.report_results()
-            rclpy.shutdown()
-            return
-
-        if now - self.phase_start_time >= self.phase_sec:
-            self.open_phase = not self.open_phase
-            self.phase_start_time = now
-
-        if self.open_phase:
+        if self.state == 'open_cmd':
             self.pub_torque.publish(Float64(data=self.torque))
-        else:
+            if dt >= self.cmd_phase_sec:
+                self.state = 'open_settle'
+                self.state_start = t
+
+        elif self.state == 'open_settle':
+            self.pub_torque.publish(Float64(data=self.torque))  # hold open
+            if dt >= self.settle_sec:
+                self.state = 'open_measure'
+                self.state_start = t
+                self.measure_active = True
+                self.current_x_open = True
+
+        elif self.state == 'open_measure':
+            self.pub_torque.publish(Float64(data=self.torque))  # hold open while measuring
+            if dt >= self.measure_window_sec:
+                self.measure_active = False
+                self.state = 'close_cmd'
+                self.state_start = t
+
+        elif self.state == 'close_cmd':
             self.pub_torque.publish(Float64(data=-self.torque))
+            if dt >= self.cmd_phase_sec:
+                self.state = 'close_settle'
+                self.state_start = t
+
+        elif self.state == 'close_settle':
+            self.pub_torque.publish(Float64(data=-self.torque))  # hold closed
+            if dt >= self.settle_sec:
+                self.state = 'close_measure'
+                self.state_start = t
+                self.measure_active = True
+                self.current_x_open = False
+
+        elif self.state == 'close_measure':
+            self.pub_torque.publish(Float64(data=-self.torque))  # hold closed while measuring
+            if dt >= self.measure_window_sec:
+                self.measure_active = False
+                self.report_results()
+                rclpy.shutdown()
+                return
 
     def check_feature_mean(self, msg):
-        now = self.now()
-        if self.phase_start_time is None or (now - self.phase_start_time) < self.ignore_sec:
+        if not self.measure_active:
             return
+        v = msg.data
+        z_open = 1 if v < self.threshold else 0
+        if z_open: self.below += 1
+        else:      self.above += 1
 
-        self.feature_mean_value = msg.data
-        z_open = 1 if self.feature_mean_value < self.threshold else 0
-        if z_open:
-            self.below += 1
-        else:
-            self.above += 1
-
-        if self.open_phase:
+        if self.current_x_open:
             self.xopen_n += 1
-            if z_open:
-                self.zopen_xopen += 1
-            else:
-                self.zclosed_xopen += 1
+            if z_open: self.zopen_xopen += 1
+            else:      self.zclosed_xopen += 1
         else:
             self.xclosed_n += 1
-            if z_open:
-                self.zopen_xclosed += 1
-            else:
-                self.zclosed_xclosed += 1
+            if z_open: self.zopen_xclosed += 1
+            else:      self.zclosed_xclosed += 1
 
     def report_results(self):
         def p(a,b): return (a/b) if b>0 else math.nan
@@ -103,11 +124,11 @@ class MoveThroughDoorBayesian(Node):
         rclpy.spin(self)
 
 def main():
-        rclpy.init()
-        node = MoveThroughDoorBayesian()
-        node.spin()
-        node.destroy_node()
-        rclpy.shutdown()
+    rclpy.init()
+    node = MoveThroughDoorBayesian()
+    node.spin()
+    node.destroy_node()
+    rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
