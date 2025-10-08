@@ -12,7 +12,7 @@ class MoveThroughDoorBayesian(Node):
         super().__init__('move_through_door_bayesian')
         self.log = self.get_logger()
         self.declare_parameter('threshold', 235.0)
-        self.declare_parameter('measure_window_sec', 60.0)
+        self.declare_parameter('measure_window_sec', 30.0)
 
         self.threshold = self.get_parameter('threshold').value
         self.measure_window_sec = self.get_parameter('measure_window_sec').value
@@ -24,7 +24,10 @@ class MoveThroughDoorBayesian(Node):
         self.cmd_phase_sec = 3.0
         self.settle_sec = 2.0
 
-        self.state = 'open_cmd'
+        self.trials_total = 3
+        self.trial_idx = 0
+
+        self.state = 'close_cmd'
         self.state_start = None
         self.measure_active = False
         self.current_x_open = None
@@ -39,7 +42,7 @@ class MoveThroughDoorBayesian(Node):
         self.zclosed_xclosed = 0
 
         self.timer = self.create_timer(heartbeat_period, self.heartbeat)
-        self.log.info(f'Threshold={self.threshold}, measure_window_sec={self.measure_window_sec}s')
+        self.log.info(f'Threshold={self.threshold}, measure_window_sec={self.measure_window_sec}s, trials={self.trials_total}')
 
     def now(self):
         return time.time()
@@ -50,35 +53,14 @@ class MoveThroughDoorBayesian(Node):
             self.state_start = t
         dt = t - self.state_start
 
-        if self.state == 'open_cmd':
-            self.pub_torque.publish(Float64(data=self.torque))
-            if dt >= self.cmd_phase_sec:
-                self.state = 'open_settle'
-                self.state_start = t
-
-        elif self.state == 'open_settle':
-            self.pub_torque.publish(Float64(data=self.torque))  # hold open
-            if dt >= self.settle_sec:
-                self.state = 'open_measure'
-                self.state_start = t
-                self.measure_active = True
-                self.current_x_open = True
-
-        elif self.state == 'open_measure':
-            self.pub_torque.publish(Float64(data=self.torque))  # hold open while measuring
-            if dt >= self.measure_window_sec:
-                self.measure_active = False
-                self.state = 'close_cmd'
-                self.state_start = t
-
-        elif self.state == 'close_cmd':
+        if self.state == 'close_cmd':
             self.pub_torque.publish(Float64(data=-self.torque))
             if dt >= self.cmd_phase_sec:
                 self.state = 'close_settle'
                 self.state_start = t
 
         elif self.state == 'close_settle':
-            self.pub_torque.publish(Float64(data=-self.torque))  # hold closed
+            self.pub_torque.publish(Float64(data=-self.torque))
             if dt >= self.settle_sec:
                 self.state = 'close_measure'
                 self.state_start = t
@@ -86,12 +68,38 @@ class MoveThroughDoorBayesian(Node):
                 self.current_x_open = False
 
         elif self.state == 'close_measure':
-            self.pub_torque.publish(Float64(data=-self.torque))  # hold closed while measuring
+            self.pub_torque.publish(Float64(data=-self.torque))
             if dt >= self.measure_window_sec:
                 self.measure_active = False
-                self.report_results()
-                rclpy.shutdown()
-                return
+                self.state = 'open_cmd'
+                self.state_start = t
+
+        elif self.state == 'open_cmd':
+            self.pub_torque.publish(Float64(data=self.torque))
+            if dt >= self.cmd_phase_sec:
+                self.state = 'open_settle'
+                self.state_start = t
+
+        elif self.state == 'open_settle':
+            self.pub_torque.publish(Float64(data=self.torque))
+            if dt >= self.settle_sec:
+                self.state = 'open_measure'
+                self.state_start = t
+                self.measure_active = True
+                self.current_x_open = True
+
+        elif self.state == 'open_measure':
+            self.pub_torque.publish(Float64(data=self.torque))
+            if dt >= self.measure_window_sec:
+                self.measure_active = False
+                self.trial_idx += 1
+                if self.trial_idx < self.trials_total:
+                    self.state = 'close_cmd'
+                    self.state_start = t
+                else:
+                    self.report_results()
+                    rclpy.shutdown()
+                    return
 
     def check_feature_mean(self, msg):
         if not self.measure_active:
