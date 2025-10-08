@@ -4,7 +4,19 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float64
 
-heartbeat_period = 0.05
+heartbeat_period = 0.1
+
+'''
+Results obtained for conditional probabilities:
+Threshold=235.0, trials=5, samples_per_trial=1000
+
+P(z=open|x=open) = 0.892 
+P(z=closed|x=open) = 0.108
+
+P(z=open|x=closed) = 0.018
+P(z=closed|x=closed) = 0.982
+'''
+
 
 class MoveThroughDoorBayesian(Node):
 
@@ -12,10 +24,8 @@ class MoveThroughDoorBayesian(Node):
         super().__init__('move_through_door_bayesian')
         self.log = self.get_logger()
         self.declare_parameter('threshold', 235.0)
-        self.declare_parameter('measure_window_sec', 30.0)
 
         self.threshold = self.get_parameter('threshold').value
-        self.measure_window_sec = self.get_parameter('measure_window_sec').value
 
         self.pub_torque = self.create_publisher(Float64, '/hinged_glass_door/torque', 1)
         self.sub_feature_mean = self.create_subscription(Float64, '/feature_mean', self.check_feature_mean, 10)
@@ -24,13 +34,15 @@ class MoveThroughDoorBayesian(Node):
         self.cmd_phase_sec = 3.0
         self.settle_sec = 2.0
 
-        self.trials_total = 3
+        self.trials_total = 5
+        self.samples_per_trial = 1000
         self.trial_idx = 0
 
         self.state = 'close_cmd'
         self.state_start = None
         self.measure_active = False
         self.current_x_open = None
+        self.measure_count = 0
 
         self.below = 0
         self.above = 0
@@ -42,7 +54,7 @@ class MoveThroughDoorBayesian(Node):
         self.zclosed_xclosed = 0
 
         self.timer = self.create_timer(heartbeat_period, self.heartbeat)
-        self.log.info(f'Threshold={self.threshold}, measure_window_sec={self.measure_window_sec}s, trials={self.trials_total}')
+        self.log.info(f'Threshold={self.threshold}, trials={self.trials_total}, samples_per_trial={self.samples_per_trial}')
 
     def now(self):
         return time.time()
@@ -66,10 +78,11 @@ class MoveThroughDoorBayesian(Node):
                 self.state_start = t
                 self.measure_active = True
                 self.current_x_open = False
+                self.measure_count = 0
 
         elif self.state == 'close_measure':
             self.pub_torque.publish(Float64(data=-self.torque))
-            if dt >= self.measure_window_sec:
+            if self.measure_count >= self.samples_per_trial:
                 self.measure_active = False
                 self.state = 'open_cmd'
                 self.state_start = t
@@ -87,10 +100,11 @@ class MoveThroughDoorBayesian(Node):
                 self.state_start = t
                 self.measure_active = True
                 self.current_x_open = True
+                self.measure_count = 0
 
         elif self.state == 'open_measure':
             self.pub_torque.publish(Float64(data=self.torque))
-            if dt >= self.measure_window_sec:
+            if self.measure_count >= self.samples_per_trial:
                 self.measure_active = False
                 self.trial_idx += 1
                 if self.trial_idx < self.trials_total:
@@ -117,6 +131,8 @@ class MoveThroughDoorBayesian(Node):
             self.xclosed_n += 1
             if z_open: self.zopen_xclosed += 1
             else:      self.zclosed_xclosed += 1
+
+        self.measure_count += 1
 
     def report_results(self):
         def p(a,b): return (a/b) if b>0 else math.nan
