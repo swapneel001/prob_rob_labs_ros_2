@@ -1,73 +1,115 @@
+#!/usr/bin/env python3
+import time
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float64
 from geometry_msgs.msg import Twist
 
+heartbeat_period = 0.1
+
 class MoveThroughDoorBayesian(Node):
+
     def __init__(self):
         super().__init__('move_through_door_bayesian')
-        self.subscription = self.create_subscription(
-            Float64, '/feature_mean', self.feature_mean_callback, 10)
-        self.publisher_ = self.create_publisher(Twist, '/cmd_vel', 10)
-        self.timer = self.create_timer(0.1, self.control_loop)
+        self.log = self.get_logger()
+        self.declare_parameter('robot_speed',1.0)
+        self.pub_torque = self.create_publisher(Float64,'/hinged_glass_door/torque',1)
+        self.pub_vel = self.create_publisher(Twist,'/cmd_vel',10)
+        self.timer = self.create_timer(heartbeat_period, self.heartbeat)
+        self.robot_speed = self.get_parameter('robot_speed').get_parameter_value().double_value
+        self.sub_feature_mean = self.create_subscription(Float64,'/feature_mean',self.check_feature_mean,1)
 
-      
-        self.prob_z_open_given_x_open = 0.782   # P(z=open | x=open)
-        self.prob_z_closed_given_x_open = 0.218  # P(z=closed | x=open)
-        self.prob_z_open_given_x_closed = 0.017  # P(z=open | x=closed)
-        self.prob_z_closed_given_x_closed = 0.983# P(z=closed | x=closed)
+        # kept variable names from your control node
+        self.feature_mean_value = 500
+        self.torque = 5.0
+        self.heartbeat_counter = 0
+        self.moving_started = False
+        self.stop_started = False
+        self.close_started = False
 
-        
-        self.belief_door_is_open = 0.5
-        
-        
+        # added bayesian fields
         self.measurement_threshold = 235.0
-        self.belief_threshold = 0.999      # [cite: 273]
-        self.state = 'WAITING_FOR_DOOR'
+        self.belief_threshold = 0.999
+        self.belief_door_is_open = 0.5
+        self.p_zo_xo = 0.782
+        self.p_zc_xo = 0.218
+        self.p_zo_xc = 0.017
+        self.p_zc_xc = 0.983
 
-    def feature_mean_callback(self, msg):
-   
-        measurement_is_open = (msg.data > self.measurement_threshold)
-        
-   
-        if measurement_is_open:
-            likelihood_open = self.prob_z_open_given_x_open
-            likelihood_closed = self.prob_z_open_given_x_closed
+        # state machine
+        self.state = 'OPENING'
+        self.state_start = time.time()
+
+    def heartbeat(self):
+        now = time.time()
+
+        if self.state == 'OPENING':
+            self.open_door()
+            self.log.info('Measuring door open probability')
+            self.log.info(f'Bel(x=open)={self.belief_door_is_open:.3f}')
+            if self.belief_door_is_open >= self.belief_threshold:
+                self.moving_started = True
+                self.state = 'MOVING'
+                self.state_start = now
+                self.move_robot()
+
+        elif self.state == 'MOVING':
+            self.log.info('Moving through door')
+            self.move_robot()
+            if now - self.state_start >= 5.0:
+                self.stop_robot()
+                self.stop_started = True
+                self.state = 'STOPPED'
+                self.state_start = now
+
+        elif self.state == 'STOPPED':
+            self.log.info('Stopped. Closing door.')
+            self.state = 'CLOSING'
+            self.close_door()
+            
+
+    def check_feature_mean(self, f):
+        self.feature_mean_value = f.data
+        z_open = (self.feature_mean_value < self.measurement_threshold)
+        if z_open:
+            like_open = self.p_zo_xo
+            like_closed = self.p_zo_xc
         else:
-            likelihood_open = self.prob_z_closed_given_x_open
-            likelihood_closed = self.prob_z_closed_given_x_closed
+            like_open = self.p_zc_xo
+            like_closed = self.p_zc_xc
 
-   
-        prior_belief_open = self.belief_door_is_open
-        prior_belief_closed = 1.0 - self.belief_door_is_open
-        
-        
-        bel_open_unnorm = likelihood_open * prior_belief_open
-        bel_closed_unnorm = likelihood_closed * prior_belief_closed
-        
-
+        prior_open = self.belief_door_is_open
+        prior_closed = 1.0 - prior_open
+        bel_open_unnorm = like_open * prior_open
+        bel_closed_unnorm = like_closed * prior_closed
         normalizer = bel_open_unnorm + bel_closed_unnorm
         if normalizer > 0.0:
             self.belief_door_is_open = bel_open_unnorm / normalizer
-      
-        self.get_logger().info(f'Belief P(open|z) = {self.belief_door_is_open:.6f}')
+            
+    def open_door(self):
+        self.log.info('Opening door')
+        self.pub_torque.publish(Float64(data=self.torque))
 
-    def control_loop(self):
-       
-        if self.state == 'WAITING_FOR_DOOR':
-            if self.belief_door_is_open > self.belief_threshold:
-                self.get_logger().info('High confidence door is OPEN! Moving forward.')
-                self.state = 'MOVING_FORWARD'
-        
-        elif self.state == 'MOVING_FORWARD':
-            move_cmd = Twist()
-            move_cmd.linear.x = 0.5
-            self.publisher_.publish(move_cmd)
+    def close_door(self):
+        self.pub_torque.publish(Float64(data=-self.torque))
 
-def main(args=None):
-    rclpy.init(args=args)
+    def move_robot(self):
+        vel_msg = Twist()
+        vel_msg.linear.x = self.robot_speed
+        self.pub_vel.publish(vel_msg)
+
+    def stop_robot(self):
+        vel_msg = Twist()
+        vel_msg.linear.x = 0.0
+        self.pub_vel.publish(vel_msg)
+
+    def spin(self):
+        rclpy.spin(self)
+
+def main():
+    rclpy.init()
     node = MoveThroughDoorBayesian()
-    rclpy.spin(node)
+    node.spin()
     node.destroy_node()
     rclpy.shutdown()
 
