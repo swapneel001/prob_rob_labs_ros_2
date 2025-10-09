@@ -33,6 +33,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'Odometry_Lab = Odometry_Lab.Odometry_Lab:main',
             'bayes_door_controller = bayes_door_controller.bayes_door_controller:main',
             'bayesian_probability_calculator = bayesian_probability_calculator.bayesian_probability_calculator:main',
             'move_through_door = move_through_door.move_through_door:main',
