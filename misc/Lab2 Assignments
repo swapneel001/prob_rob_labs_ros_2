@@ -1,0 +1,28 @@
+Assignment 1:
+
+1. The default launch files included are :
+    - spawn_turtlebot3.launch.py from package turtlebot3_gazebo
+    - robot_state_publisher.launch.py from turtlebot3_gazebo
+    - gzclient.launch.py from gazebo_ros
+    - gzserver.launch.py from gazebo_ros
+    The deafult launch file skipped is:
+    - flaky_door_opener_launch.py from prob_rob_labs
+    - video_processor_launch.py from prob_rob_vision
+    - image_mean_feature_x_launch.py from prob_rob_labs
+
+2. flaky_door_opener_launch.py from prob_rob_labs will be included if run_door_opener:=true is included
+
+3. x = -1.5, y = 0.0
+
+4. ros2 launch prob_rob_labs turtlebot3_and_door.launch.py x_pose:=-5.0 y_pose:=1.0
+
+
+Assignment 2:
+
+1. Line 132 defines the joint named hinge, and it is a revolute joint
+2. The name of the child link that hangs off the joint is called door, it's mass is 41.3265
+3.The name of the topic to publish in order to open/close the door is /hinged_glass_door/torque, and the type is Float64
+4. The command used was
+    ' ros2 topic pub --rate 1 /hinged_glass_door/torque std_msgs/msg/Float64 "{data: 1.01}" '
+
+5. Through trial and error analysis it was found the minimal value of torque that opened the door very slowly was 1.01.

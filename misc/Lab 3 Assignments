@@ -1,0 +1,47 @@
+Assignment 1:
+
+The nodes that are part of the vision pipeline are
+camera_driver -> video_processor -> image_mean_feature_x
+
+Assignment 2:
+
+The feature-mean signal is the mean of the x co-ordinates of all the feature poses published in the topic '/goodfeature/corners' . This contains all the corner point features in the door, and '/feature_mean' topic has the mean of all the x co-ordinates of these points.
+
+The detection of the door opening using the feature mean signal can work as the feature mean signal drops in value as the door opens. When the door opens, all its corner point features move towards the left, decreasing in x value, hence the feature_mean signal value drops.
+Similarly, when the door closes, the corner points move towards the right again, increasing in x value, hence the feature_mean signal value increases.
+
+Assignment 3:
+A threshold value of 280 on the feature_mean signal can be used as threshold for the door open/close status. If the value is below 280, the door can be considered open, if the value is above 280, it can be considered partially open or  closed, hence unsafe for the robot to move forward.
+
+
+
+Assignment 4:
+FeatureMean usage
+
+
+
+Assignment 5:
+The obtained conditional probabilities are:
+
+Results obtained for conditional probabilities:
+3 trials,1000 samples per trial, threshold=235.0
+Resetting world between trials.
+
+
+P(z=open|x=open) = 0.782
+P(z=closed|x=open) = 0.218
+
+P(z=open|x=closed) = 0.017
+P(z=closed|x=closed) = 0.983
+
+Assignment 6:
+Control loop using bayesian probabilities
+
+
+ Assignment 7:
+ 20 trials, 7 failures
+ Probability of door opening with flaky door opener = 0.65 (13 successes in 20 trials)
+
+ The code has a 1/5 chance of opening, 0.2 probability but due to the discussed bug in the class the experimental probability is higher.
+ 0.65 will be the probability used for the Full Bayes Filter.
+
