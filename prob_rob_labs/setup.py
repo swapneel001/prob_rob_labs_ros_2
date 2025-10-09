@@ -33,7 +33,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'bayes_door_controller = bayes_door_controller.bayes_door_controller:main',
+            'move_through_door_bayesian = move_through_door_bayesian.move_through_door_bayesian:main',
             'bayesian_probability_calculator = bayesian_probability_calculator.bayesian_probability_calculator:main',
             'move_through_door = move_through_door.move_through_door:main',
             'image_mean_feature_x = image_mean_feature_x.image_mean_feature_x:main',
