@@ -12,8 +12,8 @@ def generate_launch_description():
                               description='set to true for simulation'),
         Node(
             package='prob_rob_labs',
-            executable='move_through_door_bayesian',
-            name='move_through_door_bayesian',
+            executable='bayesian_probability_calculator',
+            name='bayesian_probability_calculator',
             parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}]
         )
     ])

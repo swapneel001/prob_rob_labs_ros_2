@@ -13,18 +13,18 @@ Results obtained for conditional probabilities:
 Resetting world between trials.
 
 
-P(z=open|x=open) = 0.645
-P(z=closed|x=open) = 0.355
+P(z=open|x=open) = 0.782
+P(z=closed|x=open) = 0.218
 
-P(z=open|x=closed) = 0.002
-P(z=closed|x=closed) = 0.998
+P(z=open|x=closed) = 0.017
+P(z=closed|x=closed) = 0.983
 '''
 
 
-class MoveThroughDoorBayesian(Node):
+class BayesianProbabilityCalculator(Node):
 
     def __init__(self):
-        super().__init__('move_through_door_bayesian')
+        super().__init__('bayesian_probability_calculator')
         self.log = self.get_logger()
         self.declare_parameter('threshold', 235.0)
 
@@ -179,7 +179,7 @@ class MoveThroughDoorBayesian(Node):
 
 def main():
     rclpy.init()
-    node = MoveThroughDoorBayesian()
+    node = BayesianProbabilityCalculator()
     node.spin()
     node.destroy_node()
     rclpy.shutdown()
