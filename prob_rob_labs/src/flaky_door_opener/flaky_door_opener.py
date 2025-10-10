@@ -5,7 +5,7 @@ from std_msgs.msg import Float64
 from std_msgs.msg import Empty
 
 max_torque = 5.0
-torque_hold = 10
+required_open_time = 3
 
 class FlakyDoorOpener(Node):
 
@@ -16,17 +16,20 @@ class FlakyDoorOpener(Node):
             Float64, '/hinged_glass_door/torque', 1)
         self.sub_command = self.create_subscription(
             Empty, '/door_open', self.handle_command, 1)
-        self.torque = 0
-        self.torque_counter = 0
+        self.state = 'trying push'
 
     def handle_command(self, _):
-        if self.torque == 0:
+        if self.state == 'trying push':
+            self.log.info(f'state: {self.state}')
             self.torque = random.choice([1.0, 0.0, 0.0, 0.0, 0.0]) * max_torque
-            self.torque_counter = 0
-        elif self.torque_counter < torque_hold:
-            self.torque_counter += 1
-        else:
-            self.torque = 0.0
+            if self.torque != 0.0:
+                self.state = 'pushing'
+                self.push_start_time = self.get_clock().now()
+        elif self.state == 'pushing':
+            self.log.info(f'state: {self.state}')
+            elapsed_time = self.get_clock().now() - self.push_start_time
+            if elapsed_time.nanoseconds / 1e9 > required_open_time:
+                self.state = 'trying push'
         self.log.info(f'door open requested using torque {self.torque}')
         self.pub_torque.publish(Float64(data=self.torque))
 
