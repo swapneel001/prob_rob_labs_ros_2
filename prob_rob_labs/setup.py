@@ -33,6 +33,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'ground_truth_publisher = ground_truth_publisher.ground_truth_publisher:main',
             'move_through_door_bayesian = move_through_door_bayesian.move_through_door_bayesian:main',
             'bayesian_probability_calculator = bayesian_probability_calculator.bayesian_probability_calculator:main',
             'move_through_door = move_through_door.move_through_door:main',
