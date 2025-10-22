@@ -10,10 +10,13 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('use_sim_time', default_value='true',
                               description='set to true for simulation'),
+        DeclareLaunchArgument('reference_frame', default_value='odom',
+                              description='reference frame for pose/twist messages'),
         Node(
             package='prob_rob_labs',
             executable='ground_truth_publisher',
             name='ground_truth_publisher',
-            parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}]
+            parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time'),
+                         'reference_frame': LaunchConfiguration('reference_frame')}]
         )
     ])
