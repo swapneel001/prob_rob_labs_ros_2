@@ -33,6 +33,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'landmark_axis_identifier = landmark_axis_identifier.landmark_axis_identifier:main',
             'ekf_odom = ekf_odom.ekf_odom:main',
             'ground_truth_publisher = ground_truth_publisher.ground_truth_publisher:main',
             'move_through_door_bayesian = move_through_door_bayesian.move_through_door_bayesian:main',
