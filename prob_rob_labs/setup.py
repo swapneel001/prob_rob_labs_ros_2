@@ -33,6 +33,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'landmark_positioner = landmark_positioner.landmark_positioner:main',
             'landmark_axis_identifier = landmark_axis_identifier.landmark_axis_identifier:main',
             'ekf_odom = ekf_odom.ekf_odom:main',
             'ground_truth_publisher = ground_truth_publisher.ground_truth_publisher:main',
