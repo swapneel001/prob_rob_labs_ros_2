@@ -33,6 +33,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'ekf_odom = ekf_odom.ekf_odom:main',
             'ground_truth_publisher = ground_truth_publisher.ground_truth_publisher:main',
             'move_through_door_bayesian = move_through_door_bayesian.move_through_door_bayesian:main',
             'bayesian_probability_calculator = bayesian_probability_calculator.bayesian_probability_calculator:main',
