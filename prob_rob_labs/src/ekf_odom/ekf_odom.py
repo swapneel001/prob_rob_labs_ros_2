@@ -12,9 +12,8 @@ from transforms3d.euler import euler2quat
 
 
 def yaw_to_quaternion(yaw: float) -> Quaternion:
-    qx, qy, qz, qw = euler2quat(0.0, 0.0, yaw)
+    qw, qx, qy, qz = euler2quat(0.0, 0.0, yaw)  # transforms3d returns (w,x,y,z)
     return Quaternion(x=qx, y=qy, z=qz, w=qw)
-
 
 class EKFOdom(Node):
     def __init__(self):
@@ -118,7 +117,7 @@ class EKFOdom(Node):
         self.G[3, 3] =  self.A_V
         self.G[4, 4] =  self.A_W
 
-        self.Sigma = self.J @ self.Sigma @ self.J.T + (self.B @ self.Sigma_u @ self.B.T)
+        self.Sigma = self.G @ self.Sigma @ self.G.T + (self.B @ self.Sigma_u @ self.B.T)
 
     def update(self, z: np.ndarray):
         y = z - (self.C @ self.x)
