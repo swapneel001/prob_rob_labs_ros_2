@@ -86,13 +86,10 @@ class EKFOdom(Node):
         dt = max(1e-6, t - self.prev_time)
         self.prev_time = t
 
-        try:
-            name_to_idx = {n: i for i, n in enumerate(jnt_msg.name)}
-            wl = jnt_msg.velocity[name_to_idx['wheel_left_joint']]
-            wr = jnt_msg.velocity[name_to_idx['wheel_right_joint']]
-        except Exception:
-            self.get_logger().warn('joint_states missing wheel_left_joint / wheel_right_joint')
-            return
+        
+        name_to_idx = {n: i for i, n in enumerate(jnt_msg.name)}
+        wl = jnt_msg.velocity[name_to_idx['wheel_left_joint']]
+        wr = jnt_msg.velocity[name_to_idx['wheel_right_joint']]
         wg = float(imu_msg.angular_velocity.z)
 
         z = np.array([[wr], [wl], [wg]], dtype=float)
