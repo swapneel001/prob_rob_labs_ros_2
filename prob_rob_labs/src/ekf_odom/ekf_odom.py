@@ -10,7 +10,6 @@ from nav_msgs.msg import Odometry
 from message_filters import Subscriber, ApproximateTimeSynchronizer
 from transforms3d.euler import euler2quat
 
-
 def yaw_to_quaternion(yaw: float) -> Quaternion:
     qw, qx, qy, qz = euler2quat(0.0, 0.0, yaw)  # transforms3d returns (w,x,y,z)
     return Quaternion(x=qx, y=qy, z=qz, w=qw)
