@@ -6,8 +6,7 @@ from rclpy.node import Node
 
 from prob_rob_msgs.msg import Point2DArrayStamped
 from sensor_msgs.msg import CameraInfo
-from geometry_msgs.msg import Point  # to publish (distance, bearing)
-
+from geometry_msgs.msg import PointStamped
 heartbeat_period = 0.1
 
 
@@ -38,7 +37,7 @@ class LandmarkPositioner(Node):
             10
         )
         topic_name = f'/vision_{self.landmark_color}/measurement'
-        self.meas_pub = self.create_publisher(Point, topic_name, 10)
+        self.meas_pub = self.create_publisher(PointStamped, topic_name, 10)
         self.log.info(f'Publishing landmark measurements on {topic_name}')
 
 
@@ -92,10 +91,12 @@ class LandmarkPositioner(Node):
             return  # avoid div by zero
         d = self.landmark_height * self.fy / (height_pix * cos_th)
 
-        out = Point()
-        out.x = float(d)
-        out.y = float(theta)
-        out.z = 0.0
+        out = PointStamped()
+        out.header.stamp = self.get_clock().now().to_msg()
+        out.header.frame_id = 'waffle_pi::camera_link'
+        out.point.x = float(d)
+        out.point.y = float(theta)
+        out.point.z = 0.0
         self.meas_pub.publish(out)
 
         shape = 'rect' if num_points < 8 else 'cyl'
