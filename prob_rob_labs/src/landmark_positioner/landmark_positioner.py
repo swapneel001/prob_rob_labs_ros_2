@@ -69,9 +69,6 @@ class LandmarkPositioner(Node):
         max_y = max(ys)
         height_pix = max_y - min_y
 
-        if height_pix < 1.0:
-            # too noisy / tiny detection
-            return
 
         if num_points < 8:
             # rectangular
@@ -84,7 +81,12 @@ class LandmarkPositioner(Node):
 
         # bearing theta
         theta = math.atan((self.cx - x_sym) / self.fx)
-        # distance 
+
+
+        MAX_BEARING = 1.0
+        if abs(theta) > MAX_BEARING:
+            return
+        #distance 
         cos_th = math.cos(theta)
         if abs(cos_th) < 1e-3:
             return  # avoid div by zero
