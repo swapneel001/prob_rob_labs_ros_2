@@ -117,7 +117,7 @@ class LandmarkPositioner(Node):
         theta = math.atan((self.cx - x_sym) / self.fx)
 
 
-        MAX_BEARING = 1.0
+        MAX_BEARING = 0.75
         if abs(theta) > MAX_BEARING:
             return
         #distance 
