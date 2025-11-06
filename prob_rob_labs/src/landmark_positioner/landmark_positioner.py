@@ -7,10 +7,21 @@ from rclpy.node import Node
 from prob_rob_msgs.msg import Point2DArrayStamped
 from sensor_msgs.msg import CameraInfo
 from geometry_msgs.msg import PointStamped
+from gazebo_msgs.msg import LinkStates  
 heartbeat_period = 0.1
 
 
 class LandmarkPositioner(Node):
+
+    COLOR_TO_LINK ={
+        'red'  : 'landmark_1::link',
+        'green': 'landmark_2::link',
+        'yellow': 'landmark_3::link',
+        'magenta': 'landmark_4::link',
+        'cyan' : 'landmark_5::link'
+    }
+
+    CAMERA_LINK = 'waffle_pi::camera_link'
 
     def __init__(self):
         super().__init__('landmark_positioner')
@@ -24,6 +35,13 @@ class LandmarkPositioner(Node):
         self.fy = None
         self.cx = None
         self.cy = None
+
+        self.latest_link_states = None
+        self.landmark_link_name = self.COLOR_TO_LINK.get(self.landmark_color, None)
+        if self.landmark_link_name is None:
+            self.log.error(f'Unknown landmark color: {self.landmark_color}')
+            return
+
         self.landmark_points_sub = self.create_subscription(
             Point2DArrayStamped,
             f'/vision_{self.landmark_color}/corners',
@@ -36,9 +54,23 @@ class LandmarkPositioner(Node):
             self.camera_info_callback,
             10
         )
+
+        self.link_states_sub = self.create_subscription(
+            LinkStates,
+            '/gazebo/link_states',
+            self.link_states_callback,
+            10
+        )
+
+
         topic_name = f'/vision_{self.landmark_color}/measurement'
         self.meas_pub = self.create_publisher(PointStamped, topic_name, 10)
         self.log.info(f'Publishing landmark measurements on {topic_name}')
+
+        err_topic = f'/vision_{self.landmark_color}/error'
+        self.err_pub = self.create_publisher(PointStamped, err_topic, 10)
+        self.log.info(f'Publishing landmark errors on {err_topic}')
+
 
 
     def heartbeat(self):
@@ -50,6 +82,9 @@ class LandmarkPositioner(Node):
         self.fy = msg.k[4]
         self.cx = msg.k[2]
         self.cy = msg.k[5]
+    
+    def link_states_callback(self, msg: LinkStates):
+        self.latest_link_states = msg
 
     def landmark_positioning_callback(self, msg: Point2DArrayStamped):
         if self.fx is None or self.fy is None or self.cx is None or self.cy is None:
@@ -102,6 +137,67 @@ class LandmarkPositioner(Node):
         shape = 'rect' if num_points < 8 else 'cyl'
         self.log.info(f'{shape}: h_pix={height_pix:.1f}, x_sym={x_sym:.1f} -> d={d:.3f} m, th={theta:.3f} rad')
 
+        self.publish_error(stamp = out.header.stamp, measured_d = d, measured_theta = theta)
+
+    def publish_error(self, stamp, measured_d, measured_theta):
+        if self.latest_link_states is None:
+            return
+
+        if self.landmark_link_name not in self.latest_link_states.name:
+            return
+
+        ls = self.latest_link_states
+        if self.CAMERA_LINK not in ls.name:
+            return
+        cam_idx = ls.name.index(self.CAMERA_LINK)
+        cam_pose = ls.pose[cam_idx]
+        cam_x = cam_pose.position.x
+        cam_y = cam_pose.position.y
+        cam_q = cam_pose.orientation
+        cam_yaw = self.quaternion_to_yaw(cam_q.x, cam_q.y, cam_q.z, cam_q.w)
+        if self.landmark_link_name not in ls.name:
+            return
+        lm_idx = ls.name.index(self.landmark_link_name)
+        lm_pose = ls.pose[lm_idx]
+        lm_x = lm_pose.position.x
+        lm_y = lm_pose.position.y
+
+        dx = lm_x - cam_x
+        dy = lm_y - cam_y
+
+        d_true = math.hypot(dx, dy)
+        ang_w = math.atan2(dy, dx)
+        theta_true = self.normalize_angle(ang_w - cam_yaw)
+        err_d = measured_d - d_true
+        err_theta = self.normalize_angle(measured_theta - theta_true)
+
+
+        err_msg = PointStamped()
+        err_msg.header.stamp = stamp
+        err_msg.header.frame_id = self.CAMERA_LINK
+        err_msg.point.x = float(err_d)
+        err_msg.point.y = float(err_theta)
+        err_msg.point.z = 0.0
+        self.err_pub.publish(err_msg)
+
+        self.log.info(f'Error: d_err={err_d:.3f} m, th_err={err_theta:.3f} rad')
+
+    @staticmethod
+    def normalize_angle(angle):
+        while angle > math.pi:
+            angle -= 2.0 * math.pi
+        while angle < -math.pi:
+            angle += 2.0 * math.pi
+        return angle
+    
+    @staticmethod
+    def quaternion_to_yaw(x, y, z, w):
+        # yaw (z-axis rotation)
+        siny_cosp = 2.0 * (w * z + x * y)
+        cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
+        yaw = math.atan2(siny_cosp, cosy_cosp)
+        return yaw
+
     def spin(self):
         rclpy.spin(self)
 
@@ -112,7 +208,6 @@ def main():
     node.spin()
     node.destroy_node()
     rclpy.shutdown()
-
 
 if __name__ == '__main__':
     main()
