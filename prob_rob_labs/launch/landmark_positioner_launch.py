@@ -10,10 +10,13 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('use_sim_time', default_value='true',
                               description='set to true for simulation'),
+        DeclareLaunchArgument('landmark_color', default_value='cyan',
+                              description='color of the landmark to identify'),
         Node(
             package='prob_rob_labs',
             executable='landmark_positioner',
             name='landmark_positioner',
-            parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}]
+            parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time'),
+                         'landmark_color': LaunchConfiguration('landmark_color')}]
         )
     ])
