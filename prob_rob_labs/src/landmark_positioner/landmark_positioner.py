@@ -8,6 +8,10 @@ from prob_rob_msgs.msg import Point2DArrayStamped
 from sensor_msgs.msg import CameraInfo
 from geometry_msgs.msg import PointStamped
 from gazebo_msgs.msg import LinkStates  
+
+import csv 
+import os
+
 heartbeat_period = 0.1
 
 
@@ -181,6 +185,22 @@ class LandmarkPositioner(Node):
         self.err_pub.publish(err_msg)
 
         self.log.info(f'Error: d_err={err_d:.3f} m, th_err={err_theta:.3f} rad')
+
+
+        log_path = os.path.expanduser('~/measurement_errors.csv')
+        file_exists = os.path.isfile(log_path)
+        t = stamp.sec + stamp.nanosec * 1e-9
+        with open(log_path, 'a', newline='') as f:
+            writer = csv.writer(f)
+            if not file_exists:
+                writer.writerow(['timestamp',
+                                 'd_meas', 'theta_meas',
+                                 'd_true', 'theta_true',
+                                 'd_err', 'theta_err'])
+            writer.writerow([t,
+                             measured_d, measured_theta,
+                             d_true, theta_true,
+                             err_d, err_theta])
 
     @staticmethod
     def normalize_angle(angle):

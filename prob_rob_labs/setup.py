@@ -33,6 +33,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'error_reader = error_reader.error_reader:main',
             'ekf_error_plotter = ekf_error_plotter.ekf_error_plotter:main',
             'landmark_positioner = landmark_positioner.landmark_positioner:main',
             'landmark_axis_identifier = landmark_axis_identifier.landmark_axis_identifier:main',
