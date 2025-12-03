@@ -8,21 +8,11 @@ from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo
 from prob_rob_msgs.msg import Point2DArrayStamped
 
-path = 'src/prob_rob_labs_ros_2/prob_rob_labs/src/landmark_ekf_localization/landmark_map.json'
+path = 'src/prob_rob_labs_ros_2/prob_rob_labs/src/landmark_ekf_localization/landmarks_map.json'
 
 
 class LandmarkEkfLocalization(Node):
-    """
-    Initial EKF localization node for the measurement branch:
 
-    - Loads landmark map from JSON (map_path parameter)
-    - Builds color -> landmark lookup (correspondence mapping)
-    - Subscribes to /vision_<color>/corners for all colors in the map
-    - For each message, computes:
-        * distance d
-        * bearing theta
-        * variances σ_d^2(d), σ_θ^2(θ) via the piecewise model
-    """
 
     def __init__(self):
         super().__init__('landmark_ekf_localization')
@@ -129,7 +119,7 @@ class LandmarkEkfLocalization(Node):
 
         cos_th = math.cos(theta)
         if abs(cos_th) < 1e-3:
-            # too close to 90°, avoid numerical blow-up
+            # too close to 90, avoid numerical blow-up
             return
 
         # Distance from apparent height:
@@ -141,8 +131,8 @@ class LandmarkEkfLocalization(Node):
         lm_pos = landmark['position']
         self.log.info(
             f'[{color}] {shape}: h_pix={height_pix:.1f}, x_sym={x_sym:.1f} '
-            f'-> d={d:.3f} m, θ={theta:.3f} rad; '
-            f'σ_d^2={var_d:.4f}, σ_θ^2={var_theta:.6f}; '
+            f'-> d={d:.3f} m, theta={theta:.3f} rad; '
+            f'var_d={var_d:.4f}, var_theta={var_theta:.6f}; '
             f'landmark at map=({lm_pos["x"]:.2f}, {lm_pos["y"]:.2f})'
         )
 
