@@ -14,7 +14,6 @@ import os
 
 heartbeat_period = 0.1
 
-
 class LandmarkPositioner(Node):
 
     COLOR_TO_LINK ={
