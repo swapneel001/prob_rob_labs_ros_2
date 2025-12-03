@@ -1,0 +1,34 @@
+{
+  "landmarks": [
+    {
+      "landmark": "landmark_1",
+      "link_name": "landmark_1::link",
+      "position": { "x": 8.5, "y": -5.0, "z": 0.25 },
+      "color": "red"
+    },
+    {
+      "landmark": "landmark_2",
+      "link_name": "landmark_2::link",
+      "position": { "x": 8.5, "y": 5.0, "z": 0.25 },
+      "color": "green"
+    },
+    {
+      "landmark": "landmark_3",
+      "link_name": "landmark_3::link",
+      "position": { "x": -11.5, "y": 5.0, "z": 0.25 },
+      "color": "yellow"
+    },
+    {
+      "landmark": "landmark_4",
+      "link_name": "landmark_4::link",
+      "position": { "x": -11.5, "y": -5.0, "z": 0.25 },
+      "color": "magenta"
+    },
+    {
+      "landmark": "landmark_5",
+      "link_name": "landmark_5::link",
+      "position": { "x": 0.0, "y": 0.0, "z": 0.25 },
+      "color": "cyan"
+    }
+  ]
+}
