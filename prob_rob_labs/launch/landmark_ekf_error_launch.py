@@ -12,8 +12,8 @@ def generate_launch_description():
                               description='set to true for simulation'),
         Node(
             package='prob_rob_labs',
-            executable='ekf_error',
-            name='ekf_error',
+            executable='landmark_ekf_error',
+            name='landmark_ekf_error',
             parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}]
         )
     ])
