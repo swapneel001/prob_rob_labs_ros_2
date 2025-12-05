@@ -1,25 +1,28 @@
 #!/usr/bin/env python3
 import math
 import json
+import numpy as np
 
 import rclpy
 from rclpy.node import Node
 
 from sensor_msgs.msg import CameraInfo
 from prob_rob_msgs.msg import Point2DArrayStamped
+from nav_msgs.msg import Odometry
+from geometry_msgs.msg import Quaternion
+from tf_transformations import quaternion_from_euler
 
-path = 'src/prob_rob_labs_ros_2/prob_rob_labs/src/landmark_ekf_localization/landmarks_map.json'
+path = 'src/prob_rob_labs_ros_2/prob_rob_labs/config/landmarks_map.json'
 
 
 class LandmarkEkfLocalization(Node):
-
 
     def __init__(self):
         super().__init__('landmark_ekf_localization')
         self.log = self.get_logger()
 
         self.declare_parameter('map_path', path)
-        self.declare_parameter('landmark_height', 0.5)  # meters (known landmark height)
+        self.declare_parameter('landmark_height', 0.5)  # meters
 
         map_path = self.get_parameter('map_path').get_parameter_value().string_value
         self.landmark_height = float(
@@ -29,6 +32,7 @@ class LandmarkEkfLocalization(Node):
         if not map_path:
             self.log.error('Parameter "map_path" is empty. Set it in the launch file.')
             raise RuntimeError('map_path parameter not set')
+
         try:
             with open(map_path, 'r') as f:
                 map_data = json.load(f)
@@ -41,13 +45,15 @@ class LandmarkEkfLocalization(Node):
             self.log.error('No "landmarks" entry found in map file.')
             raise RuntimeError('Invalid map file format')
 
-    
+        # color -> landmark dict (with "position", "landmark", etc.)
         self.landmarks_by_color = {}
         for lm in landmarks_list:
             color = lm['color']
             self.landmarks_by_color[color] = lm
 
         self.log.info(f'Loaded {len(self.landmarks_by_color)} landmarks from {map_path}')
+
+    
         self.fx = None
         self.fy = None
         self.cx = None
@@ -60,33 +66,158 @@ class LandmarkEkfLocalization(Node):
             10
         )
 
-        # Base variances
-        self.var_d_base = 0.1467      
-        self.var_theta_base = 0.000546  
+        # State: [x, y, theta]^T in base frame (e.g. base_footprint)
+        self.state = np.zeros((3, 1))
+        self.I = np.eye(3)
+        self.Cov = 0.01 * self.I
 
+        # Process noise from odometry twist covariance (v, w)
+        # M is 2x2 covariance of [v, w]
+        self.M = np.array([[1.0e-05, 0.0],
+                           [0.0,      0.001]])
+
+        # Jacobians for prediction step
+        self.G = self.I.copy()        # 3x3
+        self.V = np.zeros((3, 2))     #3x2
+
+        # Measurement noise base variances (from Lab 5 CSV analysis)
+        self.var_d_base = 0.1467     
+        self.var_theta_base = 0.000546
+        self.Q = np.zeros((2, 2))
+        self.H = np.zeros((2, 3))
+        self.H[1, 2] = -1.0
+
+
+        self.system_time = None   # rclpy.time.Time associated with current state
+        self.initialized = False  # becomes True after first measurement timestamp is set
+        self.last_vel = None      # (v, w) from /odom
+
+
+        self.odom_pub = self.create_publisher(Odometry, "/ekf_pose", 10)
+
+        # Odometry for prediction
+        self.odom_sub = self.create_subscription(
+            Odometry,
+            '/odom',
+            self.odom_callback,
+            10
+        )
+
+        # Cornerpoint topics for all colors
         self.corner_subs = {}
         for color, landmark in self.landmarks_by_color.items():
             topic = f'/vision_{color}/corners'
             sub = self.create_subscription(
                 Point2DArrayStamped,
                 topic,
+                # capture color + landmark with lambda
                 lambda msg, c=color, lm=landmark: self.corner_callback(msg, c, lm),
                 10
             )
             self.corner_subs[color] = sub
             self.log.info(f'Subscribed to corner topic: {topic}')
 
-        self.log.info('EKF measurement initialization node is ready.')
+        self.log.info('Landmark EKF localization node is ready.')
+
+    @staticmethod
+    def time_diff_sec(t_new, t_old):
+        """Return (t_new - t_old) in seconds as float."""
+        return (t_new.sec - t_old.sec) + 1e-9 * (t_new.nanosec - t_old.nanosec)
+
+    @staticmethod
+    def unwrap(angle):
+        """Wrap angle to [-pi, pi]."""
+        while angle > math.pi:
+            angle -= 2.0 * math.pi
+        while angle < -math.pi:
+            angle += 2.0 * math.pi
+        return angle
+
+    @staticmethod
+    def to_quaternion(theta):
+        """Convert yaw to geometry_msgs/Quaternion."""
+        qx, qy, qz, qw = quaternion_from_euler(0.0, 0.0, theta)
+        q = Quaternion()
+        q.x = qx
+        q.y = qy
+        q.z = qz
+        q.w = qw
+        return q
 
 
     def camera_callback(self, msg: CameraInfo):
-        # K = [fx 0 cx ; 0 fy cy ; 0 0 1]
+        # K = [fx 0 cx; 0 fy cy; 0 0 1]
         self.fx = msg.k[0]
         self.fy = msg.k[4]
         self.cx = msg.k[2]
         self.cy = msg.k[5]
 
+
+    def odom_callback(self, msg: Odometry):
+        v = msg.twist.twist.linear.x
+        w = msg.twist.twist.angular.z
+        self.last_vel = (v, w)
+
+        if not self.initialized:
+            return
+
+        timestamp = msg.header.stamp
+        dt = self.time_diff_sec(timestamp, self.system_time)
+        if dt <= 0.0:
+            # late or zero-time sample, ignore
+            return
+
+        # advance system time
+        self.system_time = timestamp
+
+        self.prediction(v, w, dt)
+        self.publish_ekf_pose(timestamp)
+
+    def prediction(self, v, w, dt):
+        theta = self.state[2, 0]
+
+        # small angular velocity → linear motion model
+        if abs(w) < 0.01:
+            # Jacobians
+            self.G[0, 2] = -v * dt * math.sin(theta)
+            self.G[1, 2] =  v * dt * math.cos(theta)
+
+            self.V[:, :] = 0.0
+            self.V[0, 0] = dt * math.cos(theta)
+            self.V[1, 0] = dt * math.sin(theta)
+            self.V[2, 1] = dt
+
+            # State update (linear)
+            self.state[0, 0] += v * dt * math.cos(theta)
+            self.state[1, 0] += v * dt * math.sin(theta)
+            self.state[2, 0] = self.unwrap(theta + w * dt)
+
+        else:
+            # Arc motion model
+            self.G[0, 2] = -v / w * math.cos(theta) + v / w * math.cos(theta + w * dt)
+            self.G[1, 2] = -v / w * math.sin(theta) + v / w * math.sin(theta + w * dt)
+
+            self.V[:, :] = 0.0
+            self.V[0, 0] = (-math.sin(theta) + math.sin(theta + w * dt)) / w
+            self.V[0, 1] = (
+                v * (math.sin(theta) - math.sin(theta + w * dt)) / (w ** 2)
+                + v * math.cos(theta + w * dt) * dt / w
+            )
+            self.V[1, 0] = (math.cos(theta) - math.cos(theta + w * dt)) / w
+            self.V[1, 1] = (
+                -v * (math.cos(theta) - math.cos(theta + w * dt)) / (w ** 2)
+                + v * math.sin(theta + w * dt) * dt / w
+            )
+            self.V[2, 1] = dt
+
+            self.state[0, 0] += -v / w * math.sin(theta) + v / w * math.sin(theta + w * dt)
+            self.state[1, 0] +=  v / w * math.cos(theta) - v / w * math.cos(theta + w * dt)
+            self.state[2, 0] = self.unwrap(theta + w * dt)
+        self.Cov = self.G @ self.Cov @ self.G.T + self.V @ self.M @ self.V.T
+
+
     def corner_callback(self, msg: Point2DArrayStamped, color: str, landmark: dict):
+        # Need camera intrinsics first
         if self.fx is None or self.fy is None or self.cx is None or self.cy is None:
             self.log.warn('No camera intrinsics yet, skipping measurement')
             return
@@ -94,7 +225,7 @@ class LandmarkEkfLocalization(Node):
         points = msg.points
         num_points = len(points)
         if num_points == 0:
-            return 
+            return
 
         xs = [p.x for p in points]
         ys = [p.y for p in points]
@@ -103,8 +234,7 @@ class LandmarkEkfLocalization(Node):
         max_y = max(ys)
         height_pix = max_y - min_y
 
-
-        #using rectangular model when landmark has fewer points so far away, cylindrical when close and more points
+        # Treat differently for rectangular vs cylindrical perception of landmarks based on number of corners
         if num_points < 8:
             min_x = min(xs)
             max_x = max(xs)
@@ -114,39 +244,124 @@ class LandmarkEkfLocalization(Node):
             x_sym = sum(xs) / float(num_points)
             shape = 'cyl'
 
-        # Bearing in camera frame
-        theta = math.atan((self.cx - x_sym) / self.fx)
+        # Bearing in camera frame (we approximate as base frame bearing for this lab)
+        theta_m = math.atan((self.cx - x_sym) / self.fx)
 
-        cos_th = math.cos(theta)
+        cos_th = math.cos(theta_m)
         if abs(cos_th) < 1e-3:
-            # too close to 90, avoid numerical blow-up
+            # too close to 90°, avoid numerical blow-up
             return
 
-        # Distance from apparent height:
-        # d = h * fy / (height_pix * cos(theta))
-        d = self.landmark_height * self.fy / (height_pix * cos_th)
+        d_m = self.landmark_height * self.fy / (height_pix * cos_th)
 
-        var_d, var_theta = self.measurement_variance(d, theta)
+        var_d, var_theta = self.measurement_variance(d_m, theta_m)
+        self.Q[0, 0] = var_d
+        self.Q[1, 1] = var_theta
 
         lm_pos = landmark['position']
         self.log.info(
             f'[{color}] {shape}: h_pix={height_pix:.1f}, x_sym={x_sym:.1f} '
-            f'-> d={d:.3f} m, theta={theta:.3f} rad; '
+            f'-> d={d_m:.3f} m, theta={theta_m:.3f} rad; '
             f'var_d={var_d:.4f}, var_theta={var_theta:.6f}; '
             f'landmark at map=({lm_pos["x"]:.2f}, {lm_pos["y"]:.2f})'
         )
 
+        timestamp = msg.header.stamp
+
+        # First ever measurement: initialize time reference, skip update
+        if not self.initialized:
+            self.initialized = True
+            self.system_time = timestamp
+            self.log.info("EKF initialized with first measurement timestamp (state left at prior).")
+            return
+
+        dt = self.time_diff_sec(timestamp, self.system_time)
+        if dt < 0.0:
+            # late-arriving sample, discard
+            self.log.warn("Received measurement with negative dt (late); discarding.")
+            return
+
+        if dt > 0.0 and self.last_vel is not None:
+            v, w = self.last_vel
+            self.prediction(v, w, dt)
+        landmark_xy = (lm_pos["x"], lm_pos["y"])
+        self.measurement_update(landmark_xy, d_m, theta_m)
+        self.system_time = timestamp
+
+        self.publish_ekf_pose(timestamp)
+
+
     def measurement_variance(self, d: float, theta: float):
-        '''
-        piecewise variance model as in lab 5, define base variances for safe zone and blow them up when too close or too far'''
+        """
+        Piecewise variance model from Lab 5:
+        - base variances from CSV in "reliable region"
+        - inflated by factor 3 otherwise
+        Reliable region: 1 m <= d <= 10 m, |theta| <= 0.6 rad
+        """
         outside_reliable = (d < 1.0) or (d > 10.0) or (abs(theta) > 0.6)
-
         factor = 3.0 if outside_reliable else 1.0
-
         var_d = factor * self.var_d_base
         var_theta = factor * self.var_theta_base
-
         return var_d, var_theta
+
+    def measurement_update(self, landmark_xy, meas_range, meas_bearing):
+        """
+        Standard EKF range-bearing update to a known landmark.
+        landmark_xy: (m_x, m_y) in map frame
+        meas_range:  measured distance d_m
+        meas_bearing: measured bearing theta_m
+        """
+        mx, my = landmark_xy
+        # difference landmark - state in map frame
+        dx = mx - self.state[0, 0]
+        dy = my - self.state[1, 0]
+
+        q = dx ** 2 + dy ** 2
+        z1 = math.sqrt(q)
+        z2 = self.unwrap(math.atan2(dy, dx) - self.state[2, 0])
+
+        self.H[0, 0] = -dx / z1
+        self.H[0, 1] = -dy / z1
+        self.H[1, 0] =  dy / q
+        self.H[1, 1] = -dx / q
+
+        # Innovation dz = z_meas - h(x)
+        dz = np.array([
+            [meas_range - z1],
+            [self.unwrap(meas_bearing - z2)]
+        ])
+
+        # S = H P H^T + R (2x2)
+        S = self.H @ self.Cov @ self.H.T + self.Q
+        # K = P H^T S^{-1} (3x2)
+        K = self.Cov @ self.H.T @ np.linalg.inv(S)
+
+        self.state = self.state + K @ dz
+        self.state[2, 0] = self.unwrap(self.state[2, 0])
+
+        self.Cov = (self.I - K @ self.H) @ self.Cov
+
+    def publish_ekf_pose(self, timestamp):
+        odom_msg = Odometry()
+        odom_msg.header.stamp = timestamp
+        odom_msg.header.frame_id = "odom"
+        odom_msg.child_frame_id = "base_footprint"
+
+        odom_msg.pose.pose.position.x = float(self.state[0, 0])
+        odom_msg.pose.pose.position.y = float(self.state[1, 0])
+        odom_msg.pose.pose.orientation = self.to_quaternion(float(self.state[2, 0]))
+
+        odom_msg.pose.covariance[0]  = float(self.Cov[0, 0])  # xx
+        odom_msg.pose.covariance[1]  = float(self.Cov[0, 1])  # xy
+        odom_msg.pose.covariance[5]  = float(self.Cov[0, 2])  # x-yaw
+        odom_msg.pose.covariance[6]  = float(self.Cov[1, 0])  # yx
+        odom_msg.pose.covariance[7]  = float(self.Cov[1, 1])  # yy
+        odom_msg.pose.covariance[11] = float(self.Cov[1, 2])  # y-yaw
+        odom_msg.pose.covariance[30] = float(self.Cov[2, 0])  # yaw-x
+        odom_msg.pose.covariance[31] = float(self.Cov[2, 1])  # yaw-y
+        odom_msg.pose.covariance[35] = float(self.Cov[2, 2])  # yaw-yaw
+
+        self.odom_pub.publish(odom_msg)
 
     def spin(self):
         rclpy.spin(self)
