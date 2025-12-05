@@ -420,7 +420,7 @@ class LandmarkEkfLocalization(Node):
     def publish_ekf_pose(self, timestamp):
         odom_msg = Odometry()
         odom_msg.header.stamp = timestamp
-        odom_msg.header.frame_id = "odom"
+        odom_msg.header.frame_id = "map"
         odom_msg.child_frame_id = "base_footprint"
 
         odom_msg.pose.pose.position.x = float(self.state[0, 0])
