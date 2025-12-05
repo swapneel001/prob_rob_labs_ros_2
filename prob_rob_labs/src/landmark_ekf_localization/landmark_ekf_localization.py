@@ -202,10 +202,10 @@ class LandmarkEkfLocalization(Node):
 
         timestamp = msg.header.stamp
         dt = self.seconds(timestamp) - self.seconds(self.system_time)
-        self.log.info(
-            f"meas stamp: {self.seconds(timestamp):.3f}, "
-            f"system_time: {self.seconds(self.system_time):.3f}, dt={dt:.3f}"
-        )
+        # self.log.info(
+        #     f"meas stamp: {self.seconds(timestamp):.3f}, "
+        #     f"system_time: {self.seconds(self.system_time):.3f}, dt={dt:.3f}"
+        # )
 
         if dt <= 0:
             # late or zero-time sample, ignore
