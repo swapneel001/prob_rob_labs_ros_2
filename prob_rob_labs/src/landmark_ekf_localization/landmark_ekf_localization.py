@@ -10,7 +10,9 @@ from sensor_msgs.msg import CameraInfo
 from prob_rob_msgs.msg import Point2DArrayStamped
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Quaternion
-from tf_transformations import quaternion_from_euler
+from tf_transformations import quaternion_from_euler, euler_from_quaternion
+
+from tf2_ros import Buffer, TransformListener, TransformException
 
 path = 'src/prob_rob_labs_ros_2/prob_rob_labs/config/landmarks_map.json'
 
@@ -53,7 +55,6 @@ class LandmarkEkfLocalization(Node):
 
         self.log.info(f'Loaded {len(self.landmarks_by_color)} landmarks from {map_path}')
 
-    
         self.fx = None
         self.fy = None
         self.cx = None
@@ -87,11 +88,17 @@ class LandmarkEkfLocalization(Node):
         self.H = np.zeros((2, 3))
         self.H[1, 2] = -1.0
 
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.T_base_to_camera = None    # TF message
+        self.cam_offset = np.zeros(2)   # [tx, ty] camera position in base frame
+        self.cam_yaw = 0.0              # yaw offset camera wrt base
+        # poll TF until we get the transform once
+        self.tf_timer = self.create_timer(1.0, self.get_camera_transform)
 
         self.system_time = None   # rclpy.time.Time associated with current state
         self.initialized = False  # becomes True after first measurement timestamp is set
         self.last_vel = None      # (v, w) from /odom
-
 
         self.odom_pub = self.create_publisher(Odometry, "/ekf_pose", 10)
 
@@ -121,7 +128,6 @@ class LandmarkEkfLocalization(Node):
 
     @staticmethod
     def time_diff_sec(t_new, t_old):
-        """Return (t_new - t_old) in seconds as float."""
         return (t_new.sec - t_old.sec) + 1e-9 * (t_new.nanosec - t_old.nanosec)
 
     @staticmethod
@@ -144,6 +150,41 @@ class LandmarkEkfLocalization(Node):
         q.w = qw
         return q
 
+    # quaternion -> yaw helper for TF
+    def q2yaw(self, quat):
+        roll, pitch, yaw = euler_from_quaternion(
+            [quat.x, quat.y, quat.z, quat.w]
+        )
+        return yaw
+
+   #get base_link -> camera_rgb_frame transform
+    def get_camera_transform(self):
+        if self.T_base_to_camera is not None:
+            return
+
+        try:
+            tf_msg = self.tf_buffer.lookup_transform(
+                'base_link',          # target frame
+                'camera_rgb_frame',   # source frame
+                rclpy.time.Time(),
+                timeout=rclpy.duration.Duration(seconds=1.0)
+            )
+        except TransformException as ex:
+            self.log.warn(f'Could not get base_link -> camera_rgb_frame transform yet: {ex}')
+            return
+
+        self.T_base_to_camera = tf_msg
+        trans = tf_msg.transform.translation
+        rot = tf_msg.transform.rotation
+
+        self.cam_offset = np.array([trans.x, trans.y])
+        self.cam_yaw = self.q2yaw(rot)
+
+        self.log.info(
+            f'Camera transform: tx={self.cam_offset[0]:.3f}, '
+            f'ty={self.cam_offset[1]:.3f}, yaw={self.cam_yaw:.3f}'
+        )
+        self.tf_timer.cancel()
 
     def camera_callback(self, msg: CameraInfo):
         # K = [fx 0 cx; 0 fy cy; 0 0 1]
@@ -151,7 +192,6 @@ class LandmarkEkfLocalization(Node):
         self.fy = msg.k[4]
         self.cx = msg.k[2]
         self.cy = msg.k[5]
-
 
     def odom_callback(self, msg: Odometry):
         v = msg.twist.twist.linear.x
@@ -215,7 +255,6 @@ class LandmarkEkfLocalization(Node):
             self.state[2, 0] = self.unwrap(theta + w * dt)
         self.Cov = self.G @ self.Cov @ self.G.T + self.V @ self.M @ self.V.T
 
-
     def corner_callback(self, msg: Point2DArrayStamped, color: str, landmark: dict):
         # Need camera intrinsics first
         if self.fx is None or self.fy is None or self.cx is None or self.cy is None:
@@ -259,12 +298,6 @@ class LandmarkEkfLocalization(Node):
         self.Q[1, 1] = var_theta
 
         lm_pos = landmark['position']
-        self.log.info(
-            f'[{color}] {shape}: h_pix={height_pix:.1f}, x_sym={x_sym:.1f} '
-            f'-> d={d_m:.3f} m, theta={theta_m:.3f} rad; '
-            f'var_d={var_d:.4f}, var_theta={var_theta:.6f}; '
-            f'landmark at map=({lm_pos["x"]:.2f}, {lm_pos["y"]:.2f})'
-        )
 
         timestamp = msg.header.stamp
 
@@ -290,7 +323,6 @@ class LandmarkEkfLocalization(Node):
 
         self.publish_ekf_pose(timestamp)
 
-
     def measurement_variance(self, d: float, theta: float):
         """
         Piecewise variance model from Lab 5:
@@ -311,19 +343,45 @@ class LandmarkEkfLocalization(Node):
         meas_range:  measured distance d_m
         meas_bearing: measured bearing theta_m
         """
+        # if we don't yet know the camera transform, we cannot fuse properly
+        if self.T_base_to_camera is None:
+            return
+
         mx, my = landmark_xy
-        # difference landmark - state in map frame
-        dx = mx - self.state[0, 0]
-        dy = my - self.state[1, 0]
 
+        # base state
+        x = self.state[0, 0]
+        y = self.state[1, 0]
+        theta = self.state[2, 0]
+
+        # camera pose in map frame: base pose + rotated offset
+        tx, ty = self.cam_offset[0], self.cam_offset[1]
+        x_cam = math.cos(theta) * tx - math.sin(theta) * ty + x
+        y_cam = math.sin(theta) * tx + math.cos(theta) * ty + y
+        theta_cam = theta + self.cam_yaw
+
+        # expected measurement from camera frame
+        dx = mx - x_cam
+        dy = my - y_cam
         q = dx ** 2 + dy ** 2
-        z1 = math.sqrt(q)
-        z2 = self.unwrap(math.atan2(dy, dx) - self.state[2, 0])
+        if q < 1e-9:
+            return
 
+        z1 = math.sqrt(q)
+        z2 = self.unwrap(math.atan2(dy, dx) - theta_cam)
+
+        # derivative of camera position wrt theta (how offset rotates)
+        n_x = -math.sin(theta) * tx - math.cos(theta) * ty
+        n_y =  math.cos(theta) * tx - math.sin(theta) * ty
+
+        # Jacobian H with camera offset
         self.H[0, 0] = -dx / z1
         self.H[0, 1] = -dy / z1
+        self.H[0, 2] = (-dx * n_x - dy * n_y) / z1
+
         self.H[1, 0] =  dy / q
         self.H[1, 1] = -dx / q
+        self.H[1, 2] = (dy * n_x - dx * n_y) / q - 1.0
 
         # Innovation dz = z_meas - h(x)
         dz = np.array([
