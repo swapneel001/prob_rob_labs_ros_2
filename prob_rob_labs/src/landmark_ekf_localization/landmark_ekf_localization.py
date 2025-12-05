@@ -127,10 +127,6 @@ class LandmarkEkfLocalization(Node):
         self.log.info('Landmark EKF localization node is ready.')
 
     @staticmethod
-    def time_diff_sec(t_new, t_old):
-        return (t_new.sec - t_old.sec) + 1e-9 * (t_new.nanosec - t_old.nanosec)
-
-    @staticmethod
     def unwrap(angle):
         """Wrap angle to [-pi, pi]."""
         while angle > math.pi:
@@ -192,6 +188,9 @@ class LandmarkEkfLocalization(Node):
         self.fy = msg.k[4]
         self.cx = msg.k[2]
         self.cy = msg.k[5]
+    
+    def seconds(self, timestamp):
+        return timestamp.sec + timestamp.nanosec / 1e9
 
     def odom_callback(self, msg: Odometry):
         v = msg.twist.twist.linear.x
@@ -202,8 +201,9 @@ class LandmarkEkfLocalization(Node):
             return
 
         timestamp = msg.header.stamp
-        dt = self.time_diff_sec(timestamp, self.system_time)
-        if dt <= 0.0:
+        dt = self.seconds(timestamp) - self.seconds(self.system_time)
+        if dt <= -0.05:
+            #added tolerance of 50ms for minor clock sync issues
             # late or zero-time sample, ignore
             return
 
@@ -287,8 +287,10 @@ class LandmarkEkfLocalization(Node):
         theta_m = math.atan((self.cx - x_sym) / self.fx)
 
         cos_th = math.cos(theta_m)
-        if abs(cos_th) < 1e-3:
+
+        if height_pix <= 0 or abs(cos_th) < 1e-3:
             # too close to 90°, avoid numerical blow-up
+
             return
 
         d_m = self.landmark_height * self.fy / (height_pix * cos_th)
@@ -308,9 +310,11 @@ class LandmarkEkfLocalization(Node):
             self.log.info("EKF initialized with first measurement timestamp (state left at prior).")
             return
 
-        dt = self.time_diff_sec(timestamp, self.system_time)
-        if dt < 0.0:
+        dt = self.seconds(timestamp) - self.seconds(self.system_time)
+        self.log.info(f'dt value {dt}')
+        if dt < -0.05:        
             # late-arriving sample, discard
+            #added tolerance of 50ms for minor clock sync issues
             self.log.warn("Received measurement with negative dt (late); discarding.")
             return
 
