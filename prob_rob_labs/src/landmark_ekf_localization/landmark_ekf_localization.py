@@ -202,8 +202,12 @@ class LandmarkEkfLocalization(Node):
 
         timestamp = msg.header.stamp
         dt = self.seconds(timestamp) - self.seconds(self.system_time)
-        if dt <= -0.05:
-            #added tolerance of 50ms for minor clock sync issues
+        self.log.info(
+            f"meas stamp: {self.seconds(timestamp):.3f}, "
+            f"system_time: {self.seconds(self.system_time):.3f}, dt={dt:.3f}"
+        )
+
+        if dt <= 0:
             # late or zero-time sample, ignore
             return
 
@@ -311,20 +315,30 @@ class LandmarkEkfLocalization(Node):
             return
 
         dt = self.seconds(timestamp) - self.seconds(self.system_time)
-        self.log.info(f'dt value {dt}')
-        if dt < -0.05:        
-            # late-arriving sample, discard
-            #added tolerance of 50ms for minor clock sync issues
-            self.log.warn("Received measurement with negative dt (late); discarding.")
+        #self.log.info(f'dt value {dt}')
+        #self.log.info(
+        #    f"meas stamp: {self.seconds(timestamp):.3f}, "
+        #    f"system_time: {self.seconds(self.system_time):.3f}, dt={dt:.3f}"
+        #)
+
+        if dt < -0.2:        
+            # very late-arriving sample, discard
+            #added tolerance for minor clock sync issues
+            #self.log.warn("Received measurement with negative dt (late); discarding.")
+            return
+        if dt <= 0.0:
+            landmark_xy = (lm_pos["x"], lm_pos["y"])
+            self.measurement_update(landmark_xy, d_m, theta_m)
+            self.publish_ekf_pose(self.system_time)
             return
 
-        if dt > 0.0 and self.last_vel is not None:
+        if self.last_vel is not None:
             v, w = self.last_vel
             self.prediction(v, w, dt)
+
         landmark_xy = (lm_pos["x"], lm_pos["y"])
         self.measurement_update(landmark_xy, d_m, theta_m)
         self.system_time = timestamp
-
         self.publish_ekf_pose(timestamp)
 
     def measurement_variance(self, d: float, theta: float):

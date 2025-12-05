@@ -33,6 +33,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'ekf_error = ekf_error.ekf_error:main',
             'landmark_ekf_localization = landmark_ekf_localization.landmark_ekf_localization:main',
             'error_reader = error_reader.error_reader:main',
             'ekf_error_plotter = ekf_error_plotter.ekf_error_plotter:main',
