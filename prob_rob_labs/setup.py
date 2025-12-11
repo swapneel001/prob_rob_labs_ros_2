@@ -33,6 +33,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'ekf_slam = ekf_slam.ekf_slam:main',
             'landmark_ekf_tf_tree = landmark_ekf_tf_tree.landmark_ekf_tf_tree:main',
             'landmark_ekf_error = landmark_ekf_error.landmark_ekf_error:main',
             'landmark_ekf_localization = landmark_ekf_localization.landmark_ekf_localization:main',
