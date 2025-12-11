@@ -35,6 +35,8 @@ setup(
         'console_scripts': [
             'image_mean_feature_x = image_mean_feature_x.image_mean_feature_x:main',
             'flaky_door_opener = flaky_door_opener.flaky_door_opener:main',
+	    'slam_frontend = slam_frontend.slam_frontend:main',
+	    'slam_evaluator = slam_evaluator.slam_evaluator:main',
         ],
     }
 )
