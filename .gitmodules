@@ -1,3 +1,6 @@
 [submodule "turtlebot3_simulations"]
 	path = turtlebot3_simulations
 	url = https://github.com/ihadzic/turtlebot3_simulations.git
+[submodule "prob_rob_labs/src/ekf_slam"]
+	path = prob_rob_labs/src/ekf_slam
+	url = git@github.com:swapneel001/ekf_slam.git
