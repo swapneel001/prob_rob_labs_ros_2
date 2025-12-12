@@ -22,4 +22,10 @@ def generate_launch_description():
             name='ekf_slam_error',
             parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}]
         ),
+        Node(
+            package='prob_rob_labs',
+            executable='ekf_slam_tftree',
+            name='ekf_slam_tftree',
+            parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}]
+        ),
     ])
