@@ -22,14 +22,6 @@ ros2 launch prob_rob_labs ekf_slam_launch.py &
 PIDS+=($!)
 sleep 2
 
-# echo "Starting SLAM Error node..."
-# ros2 launch prob_rob_labs ekf_slam_error_launch.py &
-# PIDS+=($!)
-# sleep 1
-
-echo "Opening teleop twist keyboard..."
-ros2 run teleop_twist_keyboard teleop_twist_keyboard &
-PIDS+=($!)
 
 echo "Opening rqt_plot..."
 ros2 run rqt_plot rqt_plot &
