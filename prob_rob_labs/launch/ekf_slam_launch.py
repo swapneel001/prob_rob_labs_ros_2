@@ -15,5 +15,11 @@ def generate_launch_description():
             executable='ekf_slam',
             name='ekf_slam',
             parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}]
-        )
+        ),
+        Node(
+            package='prob_rob_labs',
+            executable='ekf_slam_error',
+            name='ekf_slam_error',
+            parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}]
+        ),
     ])

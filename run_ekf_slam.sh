@@ -17,13 +17,13 @@ ros2 launch prob_rob_labs ground_truth_publisher_launch.py &
 PIDS+=($!)
 sleep 2
 
-echo "Starting EKF SLAM..."
+echo "Starting EKF SLAM and error plot..."
 ros2 launch prob_rob_labs ekf_slam_launch.py &
 PIDS+=($!)
 sleep 2
 
-# echo "Starting EKF Error node..."
-# ros2 launch prob_rob_labs landmark_ekf_error_launch.py &
+# echo "Starting SLAM Error node..."
+# ros2 launch prob_rob_labs ekf_slam_error_launch.py &
 # PIDS+=($!)
 # sleep 1
 
