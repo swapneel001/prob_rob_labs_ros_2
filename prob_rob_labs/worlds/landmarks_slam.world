@@ -48,13 +48,13 @@
     <include>
       <name>landmark_1</name>
       <uri>model://red_landmark</uri>
-      <pose>8.5 -5.0 0.25 0 0 0</pose>
+      <pose>8.5 -8.5 0.25 0 0 0</pose>
     </include>
     <!-- Green: far front left (unchanged) -->
     <include>
       <name>landmark_2</name>
       <uri>model://green_landmark</uri>
-      <pose>8.5 5.0 0.25 0 0 0</pose>
+      <pose>8.5 8.5 0.25 0 0 0</pose>
     </include>
     <!-- Yellow: mid-back left (closer, asymmetric) -->
     <include>
