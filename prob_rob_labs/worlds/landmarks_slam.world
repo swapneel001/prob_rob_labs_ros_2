@@ -60,13 +60,13 @@
     <include>
       <name>landmark_3</name>
       <uri>model://yellow_landmark</uri>
-      <pose>-5.0 3.5 0.25 0 0 0</pose>
+      <pose>-6.0 6.5 0.25 0 0 0</pose>
     </include>
     <!-- Magenta: back right (closer, asymmetric) -->
     <include>
       <name>landmark_4</name>
       <uri>model://magenta_landmark</uri>
-      <pose>-6.5 -2.0 0.25 0 0 0</pose>
+      <pose>-10.5 -2.0 0.25 0 0 0</pose>
     </include>
     <!-- Cyan: center (unchanged) -->
     <include>
