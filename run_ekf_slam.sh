@@ -23,9 +23,9 @@ PIDS+=($!)
 sleep 2
 
 
-echo "Opening rqt_plot..."
-ros2 run rqt_plot rqt_plot &
-PIDS+=($!)
+# echo "Opening rqt_plot..."
+# ros2 run rqt_plot rqt_plot &
+# PIDS+=($!)
 
 echo "Everything launched!"
 echo "Press Ctrl+C to stop everything."
