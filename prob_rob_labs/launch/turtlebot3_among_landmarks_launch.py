@@ -52,7 +52,7 @@ def generate_launch_description():
 
     declare_world_arg = DeclareLaunchArgument(
         'world',
-        default_value='landmarks.world',
+        default_value='landmarks_slam.world',
         description='Name of the world file (located in prob_rob_labs/worlds/)'
     )
 
