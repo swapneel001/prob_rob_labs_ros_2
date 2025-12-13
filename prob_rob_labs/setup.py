@@ -16,6 +16,8 @@ data_files=[
     (os.path.join('share', package_name, 'worlds'), glob('worlds/*.world')),
     (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
     (os.path.join('share', package_name, 'launch'), launch_files),
+    (os.path.join('share', package_name, 'config'), glob('config/*.rviz')),
+
 ]
 
 setup(
