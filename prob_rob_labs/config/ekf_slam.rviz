@@ -31,6 +31,29 @@ Visualization Manager:
         Reliability Policy: Reliable
       Value: true
 
+      
+    - Class: rviz_default_plugins/Marker
+      Name: EKF Trajectory
+      Enabled: true
+      Topic:
+        Value: /ekf_slam/trajectory
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+      Value: true
+
+    - Class: rviz_default_plugins/Marker
+      Name: Ground Truth Trajectory
+      Enabled: true
+      Topic:
+        Value: /ground_truth/trajectory
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+      Value: true
+
   Global Options:
     Background Color: 48; 48; 48
     Fixed Frame: map
